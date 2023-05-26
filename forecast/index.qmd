@@ -1,0 +1,36 @@
+# Introduction
+
+
+## Steps
+
+-   Get and clean historical PMT and related data
+
+-   Get and clean economic data
+
+-   Examine recent trends
+
+-   Forecast revenue
+
+## Appendices
+
+-   PMT law
+
+-   What's the lag between collections by Tax and receipt by MTA?
+
+    -   Payroll tax -- 1 month assumption for now
+    
+    -   Self employment net earnings tax
+
+-   2023 changes
+
+## Notes
+
+-   PMT projections CY 2023 and 2024
+
+-   New rates July 1
+
+-   DOB estimate for first-year impact of the 2023 changes was ~$460m, KW believes
+
+-   Full-year impact was estimated at ~$1.1 billion
+
+-   MMTOA the corp surcharge rate was fixed at 30%, no longer potentially adjusted by Tax Department [verify]
