@@ -114,7 +114,7 @@ download.file(url, destfile=fpath, mode="wb")
 #| label: ONETIME-spreadsheet-downloads
 #| eval: false
 #| include: false
-#| 
+
 # https://www.tax.ny.gov/research/collections/february-2023-tax-collections.xls
 
 # create bulk filenames
@@ -301,5 +301,206 @@ purrr::walk(dates[1:36], f)
 
 
 ```
+
+
+```{r}
+#| label: ONETIME-read-spreadsheets
+#| eval: false
+#| include: false
+
+dir <- path(here::here("data", "dtf", "bulk"))
+dir_ls(dir)
+
+files <- dir_ls(dir) |> path_file()
+files
+
+filedf <- tibble(path=dir_ls(dir)) |> 
+  mutate(file=path_file(path)) |> 
+  separate(file, into = c("month_name", "year"), remove=FALSE, extra="drop") |> 
+  mutate(year=as.integer(year),
+         month_name=str_to_lower(month_name),
+         month=match(month_name, str_to_lower(month.name)),
+         date=ymd(paste(year,month, "01"))) |> 
+  mutate(sheets=purrr::map(path, excel_sheets)) |> 
+  select(date, year, month, month_name, file, path, sheets) |> 
+  arrange(date)
+glimpse(filedf)
+count(filedf, month, month_name)
+count(filedf, year)
+
+filedfl <- filedf |> 
+  unnest_wider(col=sheets, names_sep = "_") |> 
+  pivot_longer(starts_with("sheets"),
+               names_to = "sheetnum",
+               values_to = "sheet") |> 
+  mutate(sheetnum=str_extract_after_last(sheetnum, "_") |> as.integer())
+
+count(filedfl, sheetnum, sheet)
+
+get_fname <- function(year, month){
+  filedf |> 
+    filter(year==!!year, month==!!month) |> 
+    pull(file)
+}
+
+get_fpath <- function(year, month){
+  filedf |> 
+    filter(year==!!year, month==!!month) |> 
+    pull(path)
+}
+
+fn <- get_fname(2022, 3)
+# fpath <- path(here::here("data", "dtf", "bulk", fn))
+fpath < get_fpath(2022, 3)
+excel_sheets(fpath)
+read_excel(fpath)
+
+df <- read_excel(fpath, sheet=1)
+
+# get all the data in character form, raw
+
+f <- function(date){
+  print(date)
+  date=as.Date(date)
+  year <- year(date)
+  month <- month(date)
+  fpath <- get_fpath(year, month)
+  cnames <- c("item", "gross", "refunds", "net", "junk", "fygross", "fyrefunds", "fynet")
+  df1 <- read_excel(fpath, sheet=1, col_names = FALSE, col_types = "text")
+  df2 <- df1 |> 
+    select(1:length(cnames)) |> 
+    setNames(cnames) |> 
+    mutate(row=row_number(), date=date, year=year, month=month) |> 
+    filter(!is.na(item), !is.na(fynet), fynet!="Net") |> 
+    filter(!if_all(c(gross, refunds, net, fygross, fyrefunds, fynet), is.na)) |> 
+    filter(fynet != "Monthly Gross and  Net  Tax Collections") |> 
+    relocate(date, year, month, row)
+  df2
+}
+
+check <- f(fpath)
+
+check <- f("2022-01-01")
+
+df <- purrr:::map(filedf$date, f, .progress=TRUE)
+
+df2 <- df |> 
+  list_rbind() |> 
+  filter(fynet != "Monthly Gross and  Net  Tax Collections") |> 
+  select(-junk)
+
+saveRDS(df2, here::here("data", "monthly_raw.rds"))
+
+```
+
+
+```{r}
+#| label: explore-spreadsheets
+#| eval: false
+#| include: false
+
+mtax <- readRDS(here::here("data", "monthly_raw.rds"))
+
+check <- count(mtax, item)
+
+mtavars <- check |> 
+  filter(str_detect(item, "M.C.T.") |
+           str_detect(item, "MCTM") |
+           str_detect(item, "M.T.A."))
+
+mta1 <- mtax |> 
+  filter(item %in% mtavars$item)
+
+pmt <- mta1 |> 
+  filter(str_detect(item, "Mobil")) |> 
+  pivot_longer(cols=gross:fynet) |> 
+  select(-item) |> 
+  mutate(value=as.numeric(value)) |> 
+  arrange(name, date)
+
+pmt |> 
+  filter(name=="net", year>=2010) |> 
+  ggplot(aes(date, value)) +
+  geom_line() +
+  geom_point()
+
+
+```
+
+
+
+```{r}
+#| label: get-OpenData
+#| eval: false
+#| include: false
+
+fn <- "New_York_State__Local__and_Local_Purpose_Taxes_and_Fees_Collected_Monthly_by_the_Department_of_Taxation_and_Finance__Beginning_April_1996.csv"
+
+fpath <- path(here::here("data", "dtf", "monthly", fn))
+
+df <- vroom(fpath)
+glimpse(df)
+skim(df)
+count(df, `Month of Collections`) |> ht()
+count(df |> filter(str_detect(`Month of Collections`, "2022")), `Month of Collections`)
+
+## CAUTION: verify that column names are consistent with the new variable names being given below ----
+names(df)
+df2 <- df |> 
+  setNames(c("sfy", "monthyear", "type", "tax", "value", "fymonth", "typesort", "taxsort")) |> 
+  mutate(month=ifelse(fymonth <= 9, fymonth + 3, fymonth - 9),
+         year=ifelse(month > 3, sfy - 1, sfy),
+         date=as.Date(paste0(year, "/", month, "/", 1))) |> 
+  arrange(date)
+
+count(df2, fymonth, month)
+count(df2, month, fymonth)
+
+
+```
+
+
+```{r}
+#| label: clean-vnames-mta
+#| eval: false
+#| include: false
+
+# create vnames and unique vnames ------------------------------------------------------------------
+# CAUTION: DTF did not keep one-one correspondence between type-tax and typesort-taxsort -- uniqueness appears to be tax names!!!
+
+taxnames <- count(df2, type, tax)
+
+taxoi <- taxnames |> 
+  filter(tax %in% c("Withholding Tax", "MCTD Mobility Tax") |
+           str_detect(tax, "MCTMT Personal")) |> 
+  mutate(vname=case_when(tax=="Withholding Tax" ~ "whnys",
+                         tax=="MCTD Mobility Tax" ~ "pmt_wage",
+                         str_detect(tax, "MCTMT") &
+                           str_detect(tax, "Gross") ~ "pmt_nese_gross",
+                         str_detect(tax, "MCTMT") &
+                           str_detect(tax, "Net") ~ "pmt_nese_net",
+                         str_detect(tax, "MCTMT") &
+                           str_detect(tax, "Refund") ~ "pmt_nese_refunds",
+                         str_detect(tax, "MCTMT") &
+                           str_detect(tax, "Offset") ~ "pmt_nese_offset"))
+
+mta1 <- df2 |> 
+  filter(tax %in% taxoi$tax) |> 
+  left_join(taxoi |> select(tax, vname),
+            by = join_by(tax)) |> 
+  select(date, year, month, vname, tax, value) |> 
+  arrange(vname, date)
+
+count(mta1, vname, tax)
+
+mta1 |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  ggplot(aes(date, value)) +
+  geom_line() +
+  geom_point()
+
+```
+
+
 
 
