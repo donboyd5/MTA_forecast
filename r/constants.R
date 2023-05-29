@@ -44,5 +44,24 @@ constants$nycfips <- c(36005, 36047, 36061, 36081, 36085) |> as.character()
 # constants$fips_to_boro(c("36085", "36005"))
 
 
+# County names as found in the NYSDOL QCEW
+constants$mtaregion <- read_csv("area
+Bronx County
+Kings County
+New York County
+Queens County
+Richmond County
+
+Dutchess County
+Nassau County
+Orange County
+Putnam County
+Rockland County
+Suffolk County
+Westchester County
+")
+
+
+
 
 

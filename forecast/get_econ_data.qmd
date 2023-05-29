@@ -1,0 +1,241 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# Get economic tax data
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+```
+
+```{=html}
+<!-- links
+
+Tax Dept montly data on OpenData
+https://data.ny.gov/Government-Finance/New-York-State-Local-and-Local-Purpose-Taxes-and-F/2vni-8tmb
+
+Contact: OTPA.OpenNYData@tax.ny.gov
+
+Spreadsheets with monthly collections:
+https://www.tax.ny.gov/research/collections/monthly_tax_collections.htm
+
+
+-->
+```
+
+## The New York State Department of Labor's QCEW data
+
+The New York State Department of Labor (NYSDOL) provides a version of the BLS Quarterly Census of Employment and Wages (QCEW) that has quarterly county-level wage, establishment, and employment data in a format we need. The data currently available from 2000 through the fourth quarter of 2022.
+
+```{r}
+#| label: ONETIME-get-save-nysdol-qcew
+#| eval: false
+#| include: false
+
+files <- fs::dir_ls(path=here::here("data", "nyqcew"),
+                    glob = "*csv")
+files
+
+df <- vroom(files)
+glimpse(df)
+names(df)
+# [1] "AREATYPE"    "AREA"        "YEAR"        "QUARTER"     "NAICS"       "NAICS_LEVEL" "NAICS_TITLE" "ESTAB"       "MNTH1EMP"    "MNTH2EMP"   
+# [11] "MNTH3EMP"    "TOTWAGE"     "Owner"  
+count(df, AREATYPE) # County, State
+count(df |> filter(AREATYPE=="County"), AREA)
+count(df, Owner)
+# Owner                              n
+# <chr>                          <int>
+# 1 Federal Government            102215
+# 2 Local Government              245916
+# 3 Private                      7052970
+# 4 State Government              134571
+# 5 Total Government              558464
+# 6 Total Private and Government 8068156
+
+
+df1 <- df |> 
+  rename_with(tolower) |> 
+  filter(areatype %in% c("County", "State"),
+         owner %in% c("Total Private and Government", "Local Government", "Federal Government")) |> 
+  filter(naics=="00" | (naics_level==4 & naics=="6111"))
+
+saveRDS(df1, here::here("data", "nyqcew", "mtaqcew_raw.rds"))
+
+```
+
+
+```{r}
+#| label: ONETIME-save-nysdol-qcew-slim
+#| eval: false
+#| include: false
+
+
+mtawage1 <- readRDS(here::here("data", "nyqcew", "mtaqcew_raw.rds"))
+count(mtawage1, year, quarter) |> ht()
+
+mtawage2 <- mtawage1 |> 
+  filter(area=="New York State" | area %in% constants$mtaregion$area) |> 
+  mutate(date=yq(paste0(year, "-", quarter)),
+         areatype=str_to_lower(areatype),
+         region=case_when(area %in% mtaregion$area[1:5] ~ "nyc",
+                          area %in% mtaregion$area[6:12] ~ "suburban",
+                          area == "New York State" ~ "nys",
+                          TRUE ~ "ERROR"),
+         owncode=factor(owner, 
+                        levels=c("Total Private and Government", "Local Government", "Federal Government"),
+                        labels=c("total", "locgov", "fedgov")),
+         ind=case_when(naics=="00" ~ "allind",
+                       naics=="6111" ~ "k12"))
+count(mtawage2, areatype, region, area)
+count(mtawage2, owncode, owner)
+count(mtawage2, ind, naics, naics_level, naics_title)
+
+mtawage3 <- mtawage2 |> 
+  select(date, year, qtr=quarter, region, area, ind, owncode, estab:totwage) |> 
+  pivot_longer(cols=estab:totwage)
+
+saveRDS(mtawage3, here::here("data", "nyqcew", "mtaqcew_slim.rds"))
+
+```
+
+
+```{r}
+#| label: ONETIME-mta-wagebase
+#| eval: false
+#| include: false
+
+mtawage3 <- readRDS(here::here("data", "nyqcew", "mtaqcew_slim.rds"))
+
+mtawage3 |> 
+  filter(area=="Dutchess County",
+         ind=="allind",
+         name=="totwage") |> 
+  filter(year(date)>=2010) |> 
+  ggplot(aes(date, value)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth() +
+  scale_x_date(breaks = "3 months") +
+  facet_wrap(~owncode, scales="free_y", ncol=1) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) 
+
+check <- mtawage3  |> filter(area=="New York County", date==max(date))
+check <- mtawage3  |> filter(region=="nyc", date==max(date))
+
+xk12 <-  mtawage3 |> 
+  filter(ind=="k12" & owncode=="locgov")
+
+xk12all <-  mtawage3 |> 
+  filter(ind=="k12")
+xk12all |> filter(region=="nys", date==max(date))
+xk12all |> filter(region=="nyc", date==max(date)) # no local gov k12 data for nyc -- so must subtract the total owner
+
+xfed <- mtawage3 |> 
+  filter(ind=="allind" & owncode=="fedgov")
+xfed |> filter(region=="nys", date==max(date))
+xfed |> filter(region=="nyc", date==max(date))
+
+count(xk12, area)
+
+
+mtabase1 <- mtawage3 |> 
+  filter(ind=="allind", owncode=="total") |> 
+  select(-c(ind, owncode)) |> 
+  rename(total=value) |> 
+  left_join(xk12all |> 
+              filter(owncode=="total") |> # use this due to data limitations
+              select(date, area, name, xk12=value),
+            by = join_by(date, area, name)) |> 
+  left_join(xfed |> 
+              select(date, area, name, xfed=value),
+            by = join_by(date, area, name)) |> 
+  mutate(pmtbase=total - naz(xk12) - naz(xfed))
+
+count(mtabase1, area, region)
+skim(mtabase1)
+
+saveRDS(mtabase1, here::here("data", "mta_wagebase.rds"))
+
+
+```
+
+Here is a summary of the resulting data file.
+
+
+```{r}
+#| label: summary
+#| eval: true
+#| include: true
+
+mtabase1 <- readRDS(here::here("data", "mta_wagebase.rds"))
+skim(mtabase1)
+
+```
+
+And correlation between total wages and the tax base after removing federal wages and K12 wages:
+
+```{r}
+#| label: correlation
+#| eval: true
+#| include: true
+
+mtabase1 |> filter(name=="totwage") |> select(total, pmtbase) |> cor()
+
+```
+
+
+
+```{r}
+#| label: explore
+#| eval: false
+#| include: false
+
+mtabase1 <- readRDS(here::here("data", "mta_wagebase.rds"))
+
+mtabase1 |> filter(name=="totwage") |> select(total, pmtbase) |> cor()
+
+mtabase1 |> 
+  filter(name=="totwage") |> 
+  summarise(total=sum(total), .by=c(date, region)) |> 
+  ggplot(aes(date, total)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth() +
+  scale_x_date(breaks = "3 months") +
+  facet_wrap(~region, scales="free_y", ncol=1) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) 
+
+
+mtabase1 |> 
+  filter(name=="totwage") |> 
+  summarise(total=sum(total), .by=c(date, region)) |> 
+  arrange(date) |> 
+  mutate(pch=total / lag(total) - 1, .by=region) |> 
+  mutate(region=factor(region, levels=c("nyc", "suburban", "nys"))) |> 
+  filter(year(date) >= 2010) |> 
+  ggplot(aes(date, pch)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0) +
+  scale_x_date(name=NULL, breaks = "3 months") +
+  scale_y_continuous(name="% change from year ago", 
+                     breaks=seq(-.5, .5, .05),
+                     labels=label_percent(accuracy=1)) +
+  facet_wrap(~region, ncol=1) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+
+```
+
+

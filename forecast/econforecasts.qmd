@@ -1,0 +1,37 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Economic forecasts
+
+## NYC economy (focus on wages)
+
+### NYC  Comptroller and Mayor
+
+On March 6, 2023, the City comptroller released [Comments on New York City's Preliminary Budget for Fiscal Year 2024 and Financial Plan for Fiscal Years 2023 -- 2027](https://comptroller.nyc.gov/reports/comments-on-new-york-citys-preliminary-budget-for-fiscal-year-2024-and-financial-plan-for-fiscal-years-2023-2027). It includes this table of Mayoral national and NYC economic forecasts as of January, and Comptroller forecasts most likely prepared in February:
+
+![](images/image-1283755436.png)
+
+While the report does not appear to say explicitly whether the numbers are for calendar years or city fiscal years, the text suggests they almost certainly are calendar year numbers.
+
+The Comptroller's forecast suggests somewhat slower wage growth than the Mayor's forecast. Because the Comptroller's forecast was prepared more recently it had more-recent information available and arguably should be more plausible, all else equal.
+
+The report also contains this analysis of NYC personal income tax collections:
+
+> PIT collections to-date have exceeded the prior year on the strength of withholding during the months before the high bonus season. But shrinking bonuses this winter plus the impact of a depressed stock market on January 2023 estimated payments have resulted in declining collections that are forecast to remain lower through the rest of the fiscal year.
+>
+> Income tax withholding grew strongly through the first five months of fiscal year 2023---rising by 9.9 percent in July through November versus the same months in 2021---but flattened during the start of the bonus season, rising a scant 0.4 percent year-over-year in December 2022/January 2023. There is little doubt that the switch in fortune was mostly the result of the size of the bonuses themselves, particularly in the securities industry where bonuses are closely related to financial market performance. After an especially strong year in 2021 for profits and bonuses, Wall Street profits fell 56.3 percent in 2022. Based on our analysis of withholding up through February 24th, bonus payments are tracking a 20.5 percent decline versus the previous season.
+
+### NYC Council Finance Division
+
+On March 6, 2023 the City Council Finance Division released [its forecast](https://council.nyc.gov/budget/wp-content/uploads/sites/54/2023/03/FY24-Preliminary-Plan-Council-Tax-Revenue-Forecast.pdf).
+
+I could reach out to Raymond Majewski for more details.
+
+### NYC IBO
+
+On February x, 2023, the Independent Budget Office released [its forecast](https://www.ibo.nyc.ny.us/iboreports/print-version-2023-preliminary-budget-slides.pdf).
+
+![](images/image-1030308327.png)

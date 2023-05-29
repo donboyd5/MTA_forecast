@@ -1,0 +1,176 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# Explore the data
+
+Before we forecast, we expore the data.
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+```
+
+```{=html}
+<!-- links
+
+
+
+
+-->
+```
+
+
+```{r}
+#| label: get-data
+#| eval: true
+#| include: false
+
+wagebase <- readRDS(here::here("data", "mta_wagebase.rds"))
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+
+```
+
+## QCEW wage data
+
+NYC and suburban MTA county wages. % change year over year. Note that NYC wages are more volatile than suburban wages.
+
+```{r}
+#| label: get-wagedata
+#| eval: true
+#| include: false
+
+wagebasets <- wagebase |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(key=c(area, name), index = date) 
+
+
+```
+
+
+
+```{r}
+#| label: wage-growth
+#| eval: true
+#| include: true
+#| fig-height: 8
+
+
+# level
+# wagebase |> 
+#   filter(name=="totwage") |> 
+#   summarise(total=sum(total), .by=c(date, region)) |> 
+#   ggplot(aes(date, total)) +
+#   geom_line() +
+#   geom_point() +
+#   geom_smooth() +
+#   scale_x_date(breaks = "3 months") +
+#   facet_wrap(~region, scales="free_y", ncol=1) +
+#   theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) 
+
+wagebase |> 
+  filter(name=="totwage") |> 
+  summarise(total=sum(total), .by=c(date, region)) |> 
+  arrange(date) |> 
+  mutate(pch=total / lag(total) - 1, .by=region) |> 
+  mutate(region=factor(region, levels=c("nyc", "suburban", "nys"))) |> 
+  filter(year(date) >= 2010) |> 
+  ggplot(aes(date, pch)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0) +
+  scale_x_date(name=NULL, breaks = "3 months") +
+  scale_y_continuous(name="% change from year ago", 
+                     breaks=seq(-.5, .5, .05),
+                     labels=label_percent(accuracy=1)) +
+  facet_wrap(~region, ncol=1) +
+  ggtitle("Year-over-year % change in PMT wages, NYC, MTA suburban counties, and NYS") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+
+```
+
+NYC share of wages
+```{r}
+#| label: nycshare
+#| eval: true
+#| include: true
+
+# wagebasets <- wagebase |> 
+#   mutate(date=yearmonth(date)) |> 
+#   as_tsibble(key=c(area, name), index = date) 
+
+wagebase |> 
+  filter(region %in% c("nyc", "suburban"), name=="totwage") |> 
+  summarise(pmtbase=sum(pmtbase), .by=c(date, region)) |> 
+  pivot_wider(names_from=region, values_from=pmtbase) |> 
+  mutate(nycshare=nyc / (nyc + suburban)) |>
+  filter(year(date) %in% 2017:2022) |> 
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_season(nycshare) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="% of PMT wage base", breaks=seq(.7, .9, .01), labels = label_percent()) +
+  labs(x="") +
+  ggtitle("Seasonality of NYC share of PMT QCEW wage base") +
+  theme_bw()
+
+
+```
+
+
+
+## Tax data
+
+Here we look at the payroll tax data from the Tax Department.
+
+```{r}
+#| label: get-taxdata
+#| eval: true
+#| include: false
+
+
+pmtwage <- pmt |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  arrange(date)
+
+pmtwagets <- pmtwage |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index = date) 
+
+```
+
+
+```{r}
+#| label: tax-seasonality
+#| eval: true
+#| include: true
+
+
+pmtwagets |> 
+  filter(year(date) %in% 2019:2023) |> 
+  select(date, value) |> 
+  gg_season(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  labs(x="") +
+  ggtitle("Seasonality of payroll mobility tax collections (wage tax only)") +
+  theme_bw()
+
+
+```
+
+
+
+

@@ -424,14 +424,13 @@ pmt |>
   geom_line() +
   geom_point()
 
-
 ```
 
 
 
 ```{r}
 #| label: get-OpenData
-#| eval: false
+#| eval: true
 #| include: false
 
 fn <- "New_York_State__Local__and_Local_Purpose_Taxes_and_Fees_Collected_Monthly_by_the_Department_of_Taxation_and_Finance__Beginning_April_1996.csv"
@@ -461,7 +460,7 @@ count(df2, month, fymonth)
 
 
 ```{r}
-#| label: clean-vnames-mta
+#| label: ONETIME-clean-vnames-save-mta
 #| eval: false
 #| include: false
 
@@ -499,8 +498,234 @@ mta1 |>
   geom_line() +
   geom_point()
 
+fixes_mobility <- read_csv(
+  "date, vname, fixval
+2016-11-01, pmt_wage, 96840
+2017-11-01, pmt_wage, 96741
+2018-11-01, pmt_wage, 99141
+2019-10-01, pmt_wage, 125215
+2019-11-01, pmt_wage, 102558
+2021-07-01, pmt_wage, 111347
+")
+fixes_mobility
+
+mta1 |> 
+  filter(vname=="pmt_wage", date %in% fixes_mobility$date)
+
+
+mta2 <- mta1 |> 
+  left_join(fixes_mobility,
+            by = join_by(date, vname)) |> 
+  mutate(value_original=value,
+         value=ifelse(!is.na(fixval), fixval, value)) |> 
+  select(date, year, month, vname, tax, value_original, fixval, value)
+
+mta2 |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  ggplot(aes(date, value)) +
+  geom_line() +
+  geom_point()
+
+skim(mta2)
+
+saveRDS(mta2, here::here("data", "mta_pmt_collections.rds"))
+
+
 ```
 
+
+## Fixes to the tax data
+
+
+```{r}
+#| label: fix-get
+#| eval: true
+#| include: false
+
+pmtfixed <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+
+```
+
+
+Here are the values I changed in the Tax Department's OpenData file, all pertaining to the payroll tax. The fixes are based on comparisons to the Tax Department's spreadsheets.
+
+
+```{r}
+#| label: fix-compare
+#| eval: true
+#| include: true
+
+pmtfixed |> 
+  filter(value != value_original)
+
+```
+
+
+Here is what the original and fixed data look like.
+
+
+```{r}
+#| label: fix-plot
+#| eval: true
+#| include: true
+
+pmtfixed |> 
+  filter(vname=="pmt_wage", year >= 2010) |> 
+  select(date, original=value_original, adjusted=value) |> 
+  pivot_longer(cols = c(original, adjusted)) |> 
+  mutate(name=factor(name, levels=c("original", "adjusted"))) |> 
+  ggplot(aes(date, value, colour=name)) +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values=c("darkgreen", "blue")) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  ggtitle("Original and adjusted values of the PMT wage tax") +
+  theme_bw()
+
+```
+
+
+
+
+```{r}
+#| label: forecast
+#| eval: false
+#| include: false
+
+pmtwage <- mta2 |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  arrange(date)
+
+pmtwage2 <- pmtwage |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index = date) 
+
+
+mod <- pmtwage2 |> 
+  model(arima = ARIMA(log(value))) 
+mod
+report(mod)
+
+
+fc <- mod |> 
+  forecast(h = "2 years")
+
+str(fc)
+fc$.mean
+
+fcdat <- fc |> 
+  as_tibble() |> 
+  mutate(date=as.Date(date),
+         value=.mean,
+         type="forecast")
+
+
+pdata <- pmtwage |> 
+  mutate(type="history") |> 
+  bind_rows(fcdat) |> 
+  mutate(type=factor(type, levels=c("history", "forecast"))) |> 
+  select(date, type, value)
+
+pdata |> 
+  ggplot(aes(date, value, colour=type)) +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values=c("blue", "red")) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  theme_bw()
+  
+pdata |> 
+  mutate(year=year(date)) |> 
+  summarise(value=sum(value), .by=year) |> 
+  filter(year <= 2024) |> 
+  mutate(pch=value / lag(value) - 1)
+
+pdata |> 
+  mutate(year=year(date),
+         period=ifelse(month(date)<5, "jan_apr", "may_dec")) |> 
+  summarise(value=sum(value), .by=c(year, period)) |> 
+  filter(year <= 2024) |> 
+  pivot_wider(names_from = period) |> 
+  mutate(tot=jan_apr + may_dec) |> 
+  mutate(across(.cols=-year,
+                ~ .x / lag(.x) - 1,
+         .names = "{.col}_pch"))
+
+fc |> 
+  autoplot(pmtwage, level = NULL) +
+  labs(x="") +
+  theme_bw()
+
+tail(pmtwage2)
+pmtwage2 |> 
+  filter(year(date) %in% 2019:2023) |> 
+  select(date, value) |> 
+  gg_season(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  labs(x="") +
+  ggtitle("Payroll mobility tax collections (wage tax only)") +
+  theme_bw()
+
+pdata |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index = date) |> 
+  filter(year(date) %in% 2019:2023) |> 
+  # select(date, value) |> 
+  gg_season(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  labs(x="") +
+  ggtitle("Payroll mobility tax collections (wage tax only)") +
+  theme_bw()
+
+
+
+df2 <- df |> 
+  select(date, totpmt) |> 
+  bind_rows(fc |> as_tibble() |> select(date, .mean)) |>
+  mutate(hfc=ifelse(is.na(.mean), "history", "forecast"),
+         value=ifelse(is.na(.mean), totpmt, .mean))
+glimpse(df2)  
+
+fyfc <- df2 |> 
+  as_tibble() |> 
+  mutate(fy=year(date)) |> 
+  group_by(fy) |> 
+  summarise(n=n(), value=sum(value))
+fyfc
+
+fyfc2 <- df2 |> 
+  as_tibble() |> 
+  mutate(fy=ifelse(month(date)==12,
+                   year(date) + 1,
+                   year(date))) |> 
+  group_by(fy) |> 
+  summarise(n=n(), value=sum(value))
+fyfc2
+
+p <- df2 |> 
+  mutate(date=as.Date(date), hfc=factor(hfc, levels=c("history", "forecast"))) |> 
+  filter(year(date)>=2015, date<="2023-12-01") |> 
+  ggplot(aes(date, value, colour=hfc)) +
+  geom_line(linewidth=1) +
+  geom_point(size=0.5) +
+  scale_colour_manual(values=c("blue", "red")) +
+  ggtitle("Total Payroll Mobility Tax (wages + self-employment), monthly data",
+          subtitle="History plus simple ARIMA forecast through 2023") +
+  scale_x_date(name=NULL, breaks="3 months", date_labels = "%Y-%b", expand=expansion(mult = c(0.02, .02))) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 10e6, 25e3), labels=number_format(accuracy=1, scale=1e-3)) +
+  theme_bw(base_size = 18) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  theme(legend.title=element_blank())
+p
+
+
+
+
+```
 
 
 

@@ -31,6 +31,11 @@ book:
   date-format: long
   chapters:
     - index.qmd
+    - clean_tax_data.qmd
+    - get_econ_data.qmd
+    - explore.qmd
+    - econforecasts.qmd
+    - forecast.qmd
     # - todo.qmd
     # - part: "Baseline"
     #   chapters:
