@@ -1,0 +1,268 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Forecast payroll component of the PMT
+
+## Fit tax revenue models
+
+We're going to model tax revenue as a function of total MTA wages.
+
+We'll fit from Jan 2010 through March 2023.
+
+
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+
+```
+
+```{=html}
+<!-- links
+
+
+-->
+```
+
+
+```{r}
+#| label: constants
+#| eval: true
+#| include: false
+
+source_qcew <- "Source: QCEW, obtained from NYSDOL"
+source_pmt <- "Source: Tax Department OpenData, with adjustments"
+
+```
+
+
+```{r}
+#| label: get-data
+#| eval: true
+#| include: false
+
+wagebase <- readRDS(here::here("data", "mta_wagebase.rds"))
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+wagefc <- readRDS(here::here("data", "wagefc.rds"))
+
+# note -- mape from the wage forecast
+#   region   prophet arimalog etslog prophetxcov prophetlog arimaxcov
+#   <chr>      <dbl>    <dbl>  <dbl>       <dbl>      <dbl>     <dbl>
+# 1 mta       0.0140   0.0186 0.0227      0.0182     0.0130    0.0321
+# 2 nyc       0.0154   0.0201 0.0227      0.0200     0.0142    0.0311
+# 3 suburban  0.0134   0.0206 0.0196      0.0151     0.0128    0.0252
+
+#     year .model        mta    nyc suburban
+#    <dbl> <chr>       <dbl>  <dbl>    <dbl>
+#  1  2021 growthrate 0.124  0.132    0.0946
+#  2  2022 growthrate 0.0390 0.0373   0.0448
+#  3  2023 growthrate 0.0474 0.0463   0.0513
+#  4  2024 growthrate 0.0539 0.0550   0.0500
+#  5  2021 prophet    0.124  0.132    0.0946
+#  6  2022 prophet    0.0390 0.0373   0.0448
+#  7  2023 prophet    0.0561 0.0556   0.0576
+#  8  2024 prophet    0.0443 0.0441   0.0449
+#  9  2021 prophetlog 0.124  0.132    0.0946
+# 10  2022 prophetlog 0.0390 0.0373   0.0448
+# 11  2023 prophetlog 0.0242 0.0173   0.0480
+# 12  2024 prophetlog 0.0254 0.0233   0.0322
+
+
+```
+
+
+```{r}
+#| label: prep-data
+#| eval: true
+#| include: false
+
+count(wagefc |> filter(region=="mta"), .model, type)
+
+pmtprep <- pmt |> 
+  filter(vname=="pmt_wage", year(date) >= 2010, date < "2023-04-01") |> 
+  select(date, pmt=value) |> 
+  mutate(date=yearquarter(date)) |> 
+  summarise(pmt=sum(pmt), .by=date)
+
+
+modprep <- wagefc |>
+  filter(region=="mta", .model %in% c("growthrate", "prophet", "prophetlog")) |> 
+  select(date, type, wagemod=.model, pmtwage) |> 
+  left_join(pmtprep, by = join_by(date)) |> 
+  arrange(wagemod, date)|> 
+  mutate(date=yearquarter(date),
+         covid=date %in% yearquarter(c("2020-04-01", "2020-07-01")),
+         lpmtwage=log(pmtwage)) # can't use inline transformation with prophet
+
+count(modprep, type, wagemod)
+tail(modprep, 15)
+modprep |> filter(covid)
+
+```
+
+
+```{r}
+#| label: fit-tax-quarterly
+#| eval: true
+#| include: false
+
+mods <- modprep |> 
+  filter(!is.na(pmt)) |> 
+  arrange(wagemod, date) |>
+  as_tsibble(key=wagemod, index=date) |>
+  # filter(wagemod=="growthrate") |> # any wage model will do as they all have the same history
+  # as_tsibble(index=date) |> 
+  model(
+    prophet = prophet(pmt ~ pmtwage + covid + season(period="year", order=4, type = "multiplicative")),
+    prophetlog = prophet(log(pmt) ~ lpmtwage + covid + season(period="year", order=4, type = "additive")),
+    arimalog = ARIMA(log(pmt) ~ log(pmtwage) + covid),
+    etslog=ETS(log(pmt))
+  )
+
+mods |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmt) |> 
+  as_tibble() |> 
+  # summarise(mape=mean(abs(pcterr)), .by=c(.model))
+  summarise(mape=mean(abs(pcterr)), .by=c(wagemod, .model))
+
+# prophet looks best
+
+# df2 |> components()
+count(wagefc, .model)
+
+newdata <- modprep |> 
+  filter(type=="forecast") |> 
+  select(date, wagemod, pmtwage, lpmtwage, covid) |> 
+  as_tsibble(key=wagemod, index=date)
+
+newdata
+
+fc <- mods |> 
+  forecast(new_data=newdata)
+fc
+
+fcfull <- fc |> 
+  as_tibble() |> 
+  mutate(type="forecast") |> 
+  select(date, type, wagemod, .model, pmt=.mean, pmtwage)
+
+dfbase <- mods |> 
+  augment() |> 
+  mutate(type="history") |> 
+  select(date, type, wagemod, .model, pmt)
+
+pmt_histfc <- dfbase |> 
+  as_tibble() |> 
+  bind_rows(fcfull)
+
+glimpse(pmt_histfc)
+skim(pmt_histfc)
+count(pmt_histfc, .model)
+count(pmt_histfc, wagemod, .model, type)
+
+```
+
+
+## PMT wage-tax forecast with alternative wage-growth assumptions
+
+
+```{r}
+#| label: tax-forecast
+#| eval: true
+#| include: true
+
+pmt_histfc |> 
+  filter(.model=="prophet",  year(date)>=2019) |> 
+  ggplot(aes(date, pmt, colour=wagemod)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  ggtitle("PMT wage-tax quarterly forecast under alternative wage-growth forecasts") +
+  theme_bw()
+
+pmt_histfc |> 
+  filter(.model=="prophet", year(date)<2026) |> 
+  mutate(year=year(date)) |> 
+  summarise(pmt=sum(pmt),
+            .by=c(year, wagemod)) |> 
+  mutate(pchya=pmt / lag(pmt) - 1, .by=wagemod) |> 
+  pivot_wider(names_from = wagemod, values_from = c(pmt, pchya)) |> 
+  filter(year>=2018) |> 
+  gt() |> 
+  tab_header(
+    title = html("Estimated Current Law PMT wage tax"),
+    subtitle="$ millions, and percent change"
+  ) |>
+  fmt_number(columns=starts_with("pmt_"),
+             scale=1e-3,
+             decimals=1) |>
+  fmt_percent(columns=starts_with("pchya"), decimals=1)
+
+
+```
+
+
+## Regional breakdown of the PMT wage-tax forecast with facebook prophet wage forecast
+
+```{r}
+#| label: tax-regional
+#| eval: true
+#| include: true
+
+wageshares <- wagefc |> 
+  filter(.model=="prophet") |> 
+  select(date, region, pmtwage) |> 
+  pivot_wider(names_from = region, values_from = pmtwage) |> 
+  mutate(across(c(nyc, suburban), ~ .x / mta))
+
+pmt_brkdown <- pmt_histfc |> 
+  filter(.model=="prophet", year(date)<2026) |> 
+  select(date, type, wagemod, .model, mta=pmt) |> 
+  left_join(wageshares |> select(date, nyc_share=nyc, suburban_share=suburban),
+            by = join_by(date)) |> 
+  mutate(nyc=mta * nyc_share, 
+         suburban=mta * suburban_share,
+         nyc_increase_unadj=ifelse(date>=yearquarter("2023-07-01"),
+                                   nyc * 1 * .26 / .34,
+                                   0)) |> 
+  relocate(nyc, suburban, nyc_increase_unadj, .after=mta) |> 
+  arrange(wagemod, date)
+
+tabdata <- pmt_brkdown |> 
+  arrange(wagemod, date) |> 
+  mutate(nyc4q_unadj=roll_sumr(nyc_increase_unadj, 4),
+         total=mta + nyc_increase_unadj, .by = c(wagemod),
+         total4q=roll_sumr(total, 4)) |> 
+  relocate(nyc4q_unadj, nyc_share, suburban_share, .after=total4q)
+
+tabdata |> 
+  filter(year(date)>=2023) |> 
+  select(-c(type, .model, suburban_share)) |> 
+  rename(nyc_share_current=nyc_share) |> 
+  gt() |> 
+  tab_header(
+    title = html("Estimated PMT wage tax under alternative wage forecasts"),
+    subtitle="$ millions, regional, with UNADJUSTED NYC increase (will be lower)"
+  ) |>
+  fmt_number(columns=mta:nyc4q_unadj,
+             scale=1e-3,
+             decimals=1) |>
+  fmt_percent(columns=nyc_share_current, decimals=1)
+
+
+```
+
+
+
+
+

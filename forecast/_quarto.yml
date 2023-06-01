@@ -21,6 +21,8 @@ editor_options:
 format:
   html:
     theme: cosmo
+    fig-width: 8
+    fig-height: 8
   # pdf:
   #   documentclass: scrreprt
 
@@ -35,7 +37,9 @@ book:
     - get_econ_data.qmd
     - explore.qmd
     - econforecasts.qmd
-    - forecast.qmd
+    - forecast_wageprep.qmd
+    - pmt_forecast.qmd
+    - law.qmd
     # - todo.qmd
     # - part: "Baseline"
     #   chapters:

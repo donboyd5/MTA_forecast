@@ -1,0 +1,531 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Prepare wages for forecasting
+
+## Prepare the historical and estimated wage data
+
+Wage data are quarterly and end in 2022q4. Tax data are monthly and end in April 2023. We want to have a common start point for the forecast period. There is information in the Jan-Mar 2023 tax data that we want to exploit to do a rough estimate of 2023q1 wages - essentially running the model backwards by forecasting wage data for 2023q1 based on tax data for Jan-Mar 2023 (plus prior trends.)
+
+I run several simple models to "forecast" wages for 2023q1, including facebook's open-source prophet model, an ARIMA with regression errors model, and variant. I run one of each for NYC and for MTA suburban. In each case, wages are on the lefthand side and tax revenue is on the right hand side. I estimate the model through 2022q4, and then forecast one quarter ahead to get an estimate of wages for 2023q1. I add nyc and suburban to get mta.
+
+Based on a review of results I used facebook's prophet model. 
+
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+
+```
+
+```{=html}
+<!-- links
+
+
+-->
+```
+
+
+```{r}
+#| label: constants
+#| eval: true
+#| include: false
+
+source_qcew <- "Source: QCEW, obtained from NYSDOL"
+source_pmt <- "Source: Tax Department OpenData, with adjustments"
+
+```
+
+
+```{r}
+#| label: get-data
+#| eval: true
+#| include: false
+
+wagebase <- readRDS(here::here("data", "mta_wagebase.rds"))
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+
+```
+
+
+```{r}
+#| label: extend-wage-history
+#| eval: true
+#| include: false
+
+pmt_qtr <- pmt |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  mutate(date=fdoq(date)) |> 
+  summarise(pmt=sum(value), .by = date)
+
+wagebase2 <- wagebase |> 
+  filter(region %in% c("nyc", "suburban"), year(date)>=2010, name=="totwage") |> 
+  summarise(pmtwage=sum(pmtbase), .by=c(date, region))
+skim(wagebase2)
+
+modbase1 <- wagebase2 |> 
+  left_join(pmt_qtr, by = join_by(date))
+skim(modbase1) # only goes through 2022q4, as intended
+glimpse(modbase1)
+ht(modbase1)
+
+modbase2 <- modbase1 |> 
+  mutate(date=yearquarter(date),
+         covid=date %in% yearquarter(c("2020-04-01", "2020-07-01"))) |> 
+  as_tsibble(key=region, index = date)
+  
+interval(modbase2)
+# summary(modbase2)
+
+mod1a <- modbase2 |> 
+  model(arimalog = ARIMA(log(pmtwage) ~ log(pmt) + covid),
+        arimaxcov=ARIMA(log(pmtwage) ~ log(pmt)),
+        prophetxpmt = prophet(pmtwage ~ covid +
+                            season(period="year", order=4, type = "multiplicative")),
+        prophet = prophet(pmtwage ~ pmt + covid +
+                            season(period="year", order=4, type = "multiplicative")))
+mod1a # shows a glance
+
+mod1a |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmtwage) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr)), .by=c(region, .model)) |> 
+  pivot_wider(names_from = .model, values_from = mape) |> 
+  select(region, prophet, everything())
+
+# mod1a |> 
+#   augment() |> 
+#   mutate(pcterrsq=(.resid / pmtwage)^2) |> 
+#   as_tibble() |> 
+#   summarise(rmsepct=sqrt(sum(pcterrsq)), .by=c(region, .model)) |> 
+#   pivot_wider(names_from = .model, values_from = rmsepct)
+
+# mod1a |> filter(region=="nyc") |> report()
+# mod1a |> filter(region=="suburban") |> report()
+
+newdata <- tibble(region=c("nyc", "suburban"), date=as.Date("2023-01-01")) |> 
+  left_join(pmt_qtr, by = join_by(date)) |> 
+  mutate(date=yearquarter(date), covid=FALSE) |> 
+  as_tsibble(key=region, index = date) 
+
+fc1a <- forecast(mod1a, new_data = newdata)
+fc1a
+
+fc1a |> as_tsibble()
+fc1a |> as_tsibble() |> select(region, date, pmtwage=.mean, pmt)
+
+# modbase2 |>
+#   filter(region=="nyc") |> 
+#   autoplot(pmtwage) +
+#   autolayer(fc1a |>
+#   filter(region=="nyc")) +
+#   theme_bw()
+
+wagestack <- 
+  bind_rows(modbase2 |> mutate(type="history"),
+            fc1a |> filter(.model=="prophet") |>
+              as_tsibble() |>
+              select(region, date, pmtwage=.mean, pmt) |> 
+              mutate(type="estimate")) |> 
+  as_tibble() |> 
+  select(-pmt, -covid) |> 
+  pivot_wider(names_from = region, values_from = pmtwage) |> 
+  mutate(mta=nyc + suburban) |> 
+  pivot_longer(-c(date, type), names_to = "region", values_to = "pmtwage")
+  
+
+wagestack |> tail()
+
+
+```
+
+
+Here's a summary of model estimating performance as measured by the mean absolute percentage error (MAPE - lower is better). We'll use facebook's prophet model.
+
+```{r}
+#| label: model-performance
+#| eval: true
+#| include: true
+
+mod1a |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmtwage) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr)), .by=c(region, .model)) |> 
+  pivot_wider(names_from = .model, values_from = mape) |> 
+  select(region, prophet, everything())
+
+# mod1a |> 
+#   augment() |> 
+#   mutate(pcterrsq=(.resid / pmtwage)^2) |> 
+#   as_tibble() |> 
+#   summarise(rmsepct=sqrt(sum(pcterrsq)), .by=c(region, .model)) |> 
+#   pivot_wider(names_from = .model, values_from = rmsepct)
+
+```
+
+
+
+Here are the results of estimating wages for 2023q1. Only 2023q1 is a forecast (estimate); everything else is actual data.
+
+```{r}
+#| label: show-wage-estimate
+#| eval: true
+#| include: true
+#| fig-height: 8
+
+wagestack |> 
+  filter(year(date) %in% 2022:2023) |> 
+  pivot_wider(names_from = region, values_from = pmtwage)
+
+wagestack |> 
+  arrange(date) |> 
+  mutate(across(c(pmtwage), ~ .x / lag(.x, 4) - 1), .by=region) |> 
+  ggplot(aes(date, pmtwage, colour=region)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  # scale_colour_manual(values=c("blue", "green")) +
+  scale_x_yearquarter(name=NULL, breaks = "3 months", expand = expansion(mult = .02)) +
+  scale_y_continuous(name="% change versus year ago",
+                     labels=label_percent(accuracy=.1),
+                     breaks=seq(-1, 1, .025)) +
+  ggtitle("Percent change vs. year ago of PMT wages, NYC, MTA suburban counties, and MTA total",
+          subtitle="Percent change of raw data (not seasonally adjusted). Rightmost quarter is estimated from history and PMT collections.") +
+  theme_bw(base_size = 10) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  labs(caption=source_qcew) + caption_left
+
+saveRDS(wagestack, here::here("data", "wagemta_histest.rds"))
+
+```
+
+
+## Forecast wages
+
+Prepare and save several versions of wage forecasts:
+
+-   Extrapolative model-based forecasts
+
+-   Simple forecasts based on growth assumptions
+
+### Model-based forecasts
+
+```{r}
+#| label: wage-forecast-models
+#| eval: true
+#| include: false
+
+wages <- readRDS(here::here("data", "wagemta_histest.rds"))
+skim(wages)
+glimpse(wages)
+
+mods <- wages |> 
+  arrange(date) |> 
+  mutate(covid=date %in% yearquarter(c("2020-04-01", "2020-07-01"))) |> 
+  as_tsibble(key=region, index=date) |> 
+  model(
+    prophetxcov = prophet(pmtwage ~ season(period="year", order=4, type = "multiplicative")),
+    prophet = prophet(pmtwage ~ covid + season(period="year", order=4, type = "multiplicative")),
+    prophetlog = prophet(log(pmtwage) ~ covid + season(period="year", order=4, type = "additive")),
+    arimaxcov=ARIMA(pmtwage),
+    arimalog = ARIMA(log(pmtwage) ~ covid),
+    etslog=ETS(log(pmtwage))
+  )
+
+mods |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmtwage) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr)), .by=c(region, .model)) |> 
+  pivot_wider(names_from = .model, values_from = mape) |> 
+  select(region, prophet, arimalog, etslog, everything())
+
+# mods |> 
+#   augment() |> 
+#   mutate(pcterrsq=(.resid / pmtwage)^2) |> 
+#   as_tibble() |> 
+#   summarise(rmsepct=sqrt(sum(pcterrsq)), .by=c(region, .model)) |> 
+#   pivot_wider(names_from = .model, values_from = rmsepct) |> 
+#   select(region, prophet, arimalog, etslog, everything())
+
+# df2 |> components()
+(dates <- seq.Date(as.Date("2023-04-01"), by="3 months", length.out = 13) |> yearquarter())
+newdata <- crossing(region=c("nyc", "suburban", "mta"), date=dates) |> 
+  mutate(covid=FALSE) |> 
+  as_tsibble(key=region, index=date)
+newdata
+
+fc <- mods %>% 
+  forecast(new_data = newdata)
+
+fcfull <- fc |> 
+  as_tibble() |> 
+  filter(region %in% c("nyc", "suburban")) |> 
+  mutate(type="forecast") |> 
+  select(date, region, type, .model, pmtwage=.mean) |> 
+  pivot_wider(names_from = region, values_from=pmtwage) |> 
+  mutate(mta=nyc + suburban) |> 
+  pivot_longer(-c(date, type, .model), names_to = "region", values_to = "pmtwage")
+
+dfbase <- mods |> 
+  augment() |> 
+  mutate(type="history") |> 
+  select(date, region, type, .model, pmtwage)
+
+whistfc <- dfbase |> 
+  as_tibble() |> 
+  bind_rows(fcfull)
+glimpse(whistfc)
+skim(whistfc)
+
+saveRDS(whistfc, here::here("data", "wage_histfc.rds"))
+
+
+
+# df3 |> 
+#   arrange(date) |> 
+#   mutate(pchya=fc / lag(fc, 4) - 1, .by=region) |> 
+#   select(-fc) |> 
+#   pivot_wider(names_from = region, values_from=pchya)
+
+```
+
+
+#### Model performance
+
+```{r}
+#| label: wage-forecast-model-performance
+#| eval: true
+#| include: true
+
+mods |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmtwage) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr)), .by=c(region, .model)) |> 
+  pivot_wider(names_from = .model, values_from = mape) |> 
+  select(region, prophet, arimalog, etslog, everything())
+
+
+```
+
+
+#### Model results
+
+```{r}
+#| label: wage-forecast-model-results
+#| eval: true
+#| include: true
+
+wagemod <- readRDS(here::here("data", "wage_histfc.rds"))
+# count(wagemod, type, .model)
+
+series <- c("history", "prophet", "prophetlog", "arimalog", "etslog")
+# series <- c("history", "prophet", "arimalog", "etslog")
+wagemod |> 
+  # create just one history series for each region
+  filter(type=="forecast" | (type=="history" & .model=="prophet")) |> 
+  mutate(.model=ifelse(type=="history", "history", .model)) |> 
+  filter(.model %in% series) |> 
+  mutate(.model=factor(.model, levels=series)) |> 
+  ggplot(aes(date, pmtwage, colour=.model)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~region, ncol=2, scales="free_y")
+
+wagemod_annual <- wagemod |> 
+  arrange(date) |> 
+  mutate(year=year(date)) |> 
+  filter(year <= 2024) |> 
+  summarise(pmtwage=sum(pmtwage), .by=c(year, region, .model)) |> 
+  mutate(pchya=pmtwage / lag(pmtwage) - 1, .by=c(region, .model)) |> 
+  select(-pmtwage) |> 
+  pivot_wider(names_from = .model, values_from=pchya) |> 
+  arrange(region, year)
+# wagemod_annual
+
+wagemod_annual |> 
+  filter(year >= 2021) |> 
+  select(year, region, prophetlog, prophet, arimalog, etslog)
+
+```
+
+
+### Simple wage-growth forecasts
+
+
+```{r}
+#| label: wage-forecast-growthrate
+#| eval: true
+#| include: false
+
+# wage growth forecasts
+# create some new wage data ----
+wages <- readRDS(here::here("data", "wagemta_histest.rds"))
+wages |> 
+  arrange(date) |> 
+  mutate(year=year(date)) |> 
+  filter(year < 2023) |> 
+  summarise(pmtwage=sum(pmtwage), .by=c(region, year)) |> 
+  mutate(pchya=pmtwage / lag(pmtwage) - 1, .by=region) |> 
+  summarise(pchya=mean(pchya, na.rm=TRUE), .by=region)
+
+nycgr <- .055 # based on IBO, etc.
+suburbangr <- .05 # 0.5% less than nyc, based on history
+
+grates <- tibble(region=c("nyc", "suburban"), grate=c(nycgr, suburbangr))
+
+(dates <- seq.Date(as.Date("2023-04-01"), by="3 months", length.out = 13) |> yearquarter())
+newqs <- crossing(region=c("nyc", "suburban"), date=dates) |> 
+  mutate(type="forecast") |> 
+  left_join(grates, by = join_by(region))
+
+wagegrowth1 <- bind_rows(
+  wages |> filter(region %in% c("nyc", "suburban")) |> mutate(type="history"),
+  newqs) |> 
+  mutate(qtr=quarter(date),
+         grate=ifelse(is.na(grate), 0, grate)) |> 
+  arrange(region, qtr, date) |> 
+  group_by(region, qtr) |> 
+  mutate(.model="growthrate",
+         gfactor=cumprod(1 + grate),
+         baseval=last(na.omit(pmtwage)),
+         baseval=ifelse(is.na(pmtwage), baseval, NA_real_),
+         forecast=ifelse(is.na(pmtwage), baseval * gfactor, pmtwage)) |> 
+  ungroup() |> 
+  arrange(date)
+wagegrowth1 |> filter(region=="suburban")
+ht(wagegrowth1)
+
+wagegrowth <- wagegrowth1 |> 
+  arrange(date) |> 
+  select(date, region, type, .model, forecast) |> 
+  pivot_wider(names_from = region, values_from = forecast) |> 
+  mutate(mta=nyc + suburban) |> 
+  pivot_longer(cols=c(nyc, suburban, mta), names_to = "region", values_to = "pmtwage") |> 
+  select(date, region, type, .model, pmtwage) 
+
+pdata <- wagegrowth |> 
+  arrange(region, date) |> 
+  mutate(pchya= pmtwage / lag(pmtwage, 4) - 1, .by=region)
+
+meangr <- pdata |> 
+  filter(!is.na(pchya), type != "forecast") |> 
+  summarise(pchya=mean(pchya), .by=region)
+
+pdata |> 
+  ggplot(aes(date, pchya, colour=region)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(aes(yintercept=pchya, colour=region), data=meangr)
+
+```
+
+
+## Combine and save model-based and growth-rate forecasts of wages
+
+```{r}
+#| label: wage-forecast-combined
+#| eval: true
+#| include: false
+
+wagefc <- bind_rows(wagemod, wagegrowth) |> 
+  arrange(region, .model, date)
+
+saveRDS(wagefc, here::here("data", "wagefc.rds"))
+
+
+```
+
+### Quarterly levels, selected approaches
+
+
+```{r}
+#| label: qdata
+#| eval: true
+#| include: false
+
+wagefc <- readRDS(here::here("data", "wagefc.rds"))
+
+glimpse(wagefc)
+count(wagefc, .model)
+count(wagefc, .model)
+
+
+```
+
+
+```{r}
+#| label: qlevels
+#| eval: true
+#| include: true
+
+series <- c("growthrate", "arimalog", "prophet", "prophetlog")
+series <- c("growthrate", "prophet", "prophetlog")
+wagefc |> 
+  filter(.model %in% series,
+         year(date)>=2015) |> 
+  ggplot(aes(date, pmtwage, colour=.model)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~region, ncol=1, scales = "free_y") +
+  ggtitle("Wage levels, alternative methods") +
+  theme_bw()
+
+```
+
+
+
+```{r}
+#| label: qgrowth
+#| eval: true
+#| include: true
+
+series <- c("growthrate", "arimalog", "prophet", "prophetlog")
+series <- c("growthrate", "prophet", "prophetlog")
+wagefc |> 
+  filter(.model %in% series) |> 
+  mutate(pchya=pmtwage / lag(pmtwage, 4) - 1, .by=c(region, .model)) |> 
+  filter(year(date)>=2015) |> 
+  ggplot(aes(date, pchya, colour=.model)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(breaks=seq(-1, 1, .02), labels = label_percent(accuracy = 1)) +
+  facet_wrap(~region, ncol=1, scales = "fixed") +
+  ggtitle("Wage growth rates, alternative methods") +
+  theme_bw()
+
+```
+
+### Annual growth
+
+```{r}
+#| label: agrowth
+#| eval: true
+#| include: true
+
+series <- c("growthrate", "prophet", "prophetlog")
+wagefc |> 
+  filter(.model %in% series) |> 
+  mutate(year=year(date)) |> 
+  summarise(pmtwage=sum(pmtwage), .by=c(region, year, .model)) |> 
+  mutate(pchya=pmtwage / lag(pmtwage) - 1, .by=c(region, .model)) |> 
+  filter(year %in% 2021:2024) |> 
+  select(-pmtwage) |>
+  pivot_wider(names_from = region, values_from = pchya)
+
+```
+
+

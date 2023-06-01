@@ -8,7 +8,7 @@ editor_options:
 
 ## NYC economy (focus on wages)
 
-### NYC  Comptroller and Mayor
+### NYC Comptroller and Mayor
 
 On March 6, 2023, the City comptroller released [Comments on New York City's Preliminary Budget for Fiscal Year 2024 and Financial Plan for Fiscal Years 2023 -- 2027](https://comptroller.nyc.gov/reports/comments-on-new-york-citys-preliminary-budget-for-fiscal-year-2024-and-financial-plan-for-fiscal-years-2023-2027). It includes this table of Mayoral national and NYC economic forecasts as of January, and Comptroller forecasts most likely prepared in February:
 
@@ -32,6 +32,38 @@ I could reach out to Raymond Majewski for more details.
 
 ### NYC IBO
 
-On February x, 2023, the Independent Budget Office released [its forecast](https://www.ibo.nyc.ny.us/iboreports/print-version-2023-preliminary-budget-slides.pdf).
+See [this](https://www.ibo.nyc.ny.us/iboreports/modest-economic-recovery-with-persistent-budget-challenges-may-2023.pdf) \~May 16, 2023 report.
 
-![](images/image-1030308327.png)
+> IBO's economic forecast for the New York City economy is premised on slow US economic growth in the near term.3 (In this section, years refer to calendar years unless otherwise noted.) Both IBO and the Executive Budget forecast slower growth in city employment this year, followed by greater growth in subsequent years. This year, IBO's employment forecast, however, is substantially greater---the addition of 72,900 jobs, compared with 21,400 jobs in the Executive Budget forecast. For the years after 2023, differences are smaller, with IBO predicting fewer new jobs compared with the Executive Budget in all years except 2025. The IBO and Executive Budget forecasts also differ significantly in the outlook for inflation. IBO forecasts 4.3 percent inflation locally this year, compared with 3.5 percent in the Executive Budget projections. IBO also forecasts greater inflation after 2023, ranging from 2.3 percent to 2.7 percent annually. Projected inflation is 1.9 percent or less each year in the Executive Budget outlook.
+>
+> New York City continues to lag behind the rest of the country in reaching full recovery of its pre‐ pandemic employment. Wages and personal income---major drivers of tax revenue---had been propped up, first by an influx of COVID‐19 assistance payments from the federal government, and then by resilience in higher‐wage sectors such as professional services, information, and finance. Lower‐wage sectors, such as retail trade and leisure and hospitality, which are more directly reliant on tourism, have continued to languish behind their national counterparts, as well as behind other industry sectors in the city. While IBO has not greatly altered its forecast of total employment growth from previous forecasts, its latest projections incorporate some recent changes in the outlook for several sectors.
+>
+> ...Wages and salaries account for the single largest share of personal income in the city (73.8 percent in 2022). Last year, aggregate wages and salaries in the city were \$541.1 billion, an increase of \$50.2 billion **(10.2 percent) over 2021**, the second year of strong growth after a downturn at the onset of the pandemic in 2020. This wage growth was seen across all sectors of the city's economy, as employment continued growing in almost every industry, albeit not equally across sectors.
+>
+> The three sectors with the highest average wage---financial activities, information, and professional services---accounted for \$29.4 billion (58.6 percent) of this growth, despite only explaining 32.1 percent of total employment growth. The lower‐wage leisure and hospitality sector had the highest aggregate wage growth of any industry by percentage at 29.0 percent over 2021, reflecting a tighter labor market and upward inflationary pressure. However, the wage differential means that while it contributed nearly the same amount to total employment growth (26.2 percent of the total), it saw an aggregate wage increase accounting for just \$5.0 billion (10 percent) of the total.
+>
+> IBO projects that wages will continue to grow, albeit at a slower pace, tracking trends in the employment forecast. In 2023, IBO expects wage and salary growth of \$30.1 billion (**5.6 percent**), which will increase to an average of \$34.1 billion (**5.5 percent**) in 2024 through 2027.
+>
+> Personal income includes categories beyond wages and salaries, such as non‐wage benefits, proprietor's income, dividends and interest income, and transfer payments. Total personal income growth in 2022 was low, at 1.3 percent, largely due to a sharp decline in transfer payments from the federal and state governments as pandemic‐era programs expired. However, continued growth in wages and salaries along with the other categories (including a return to growth in transfer payments through other programs) are projected to restore personal income growth by \$42.4 billion (5.8 percent) in 2023, bringing it to \$775.9 billion. After this, total personal income is projected to grow at an annual average rate of 4.8 percent, reaching \$934.2 billion in 2027.
+
+On February 9, 2023, the Independent Budget Office released [its forecast](https://www.ibo.nyc.ny.us/iboreports/print-version-2023-preliminary-budget-slides.pdf).
+
+![](images/image-1030308327.png){width="1067"}
+
+The IBO forecast of personal income growth is greater than the OMB forecast. (Wages are a large share of personal income.)
+
+Also [this](https://www.ibo.nyc.ny.us/iboreports/modest-economic-recovery-with-persistent-budget-challenges-may-2023.pdf) \~May 16, 2023 report. And this May 23, 2023 [testimony](https://www.ibo.nyc.ny.us/iboreports/testimony-on-executive-budget-for-fiscal-year-2024-may-2023.pdf). No tables with the economic forecast, but the report has this text:
+
+> An anticipated slowdown of national economic growth is likely to slow job growth in the city. For 2023, IBO projects 72,900 jobs will be added. IBO anticipates that the rate of job growth will pick up again in 2024, with 98,500 jobs added, before gradually declining from 2025 through 2027, averaging 70,500 jobs per year. Similarly, wages will continue to grow, albeit more slowly.
+>
+> ...IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
+>
+> IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
+
+## Automated forecasts of wages
+
+
+
+
+
+

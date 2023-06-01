@@ -19,13 +19,8 @@ source(here::here("r", "functions.r"))
 ```{=html}
 <!-- links
 
-Tax Dept montly data on OpenData
-https://data.ny.gov/Government-Finance/New-York-State-Local-and-Local-Purpose-Taxes-and-F/2vni-8tmb
 
-Contact: OTPA.OpenNYData@tax.ny.gov
-
-Spreadsheets with monthly collections:
-https://www.tax.ny.gov/research/collections/monthly_tax_collections.htm
+https://dol.ny.gov/occupational-and-industry-data
 
 
 -->

@@ -1,0 +1,65 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# PMT law
+
+## Payroll tax increase
+
+Per [pwc](https://www.pwc.com/us/en/services/tax/library/new-york-budget-adopts-various-tax-increases-other-changes.html):
+
+> The tax changes are mainly set forth in the revenue bill (A3009/S4009, approved 05/01/23) with some also included in the transportation bill (A3008/S4008, approved 05/02/23).
+
+> **MCTMT rate (Transportation bill, Part Q)**: The legislation increases the top rate of the MCTMT, effective on July 1, 2023, to 0.60% from 0.34%, for employers engaged in business in New York City. The bill also increases the rate imposed upon net earnings from self-employment for individuals in NYC to 0.47% for tax year 2023 and to 0.60% for tax years beginning on or after January 1, 2024. Rates remain the same for taxpayers who are not engaged in business in New York City but who are otherwise engaged in business in the counties surrounding New York City.
+
+Here's a pdf of the [transportation bill](https://legislation.nysenate.gov/pdf/bills/2023/S4008C). The main part of the payroll tax language, which establishes the payroll tax in New York City, in Part Q section 1 is below. (Other language walls off the existing language so that it applies only to the suburban counties.)
+
+![](images/image-188368306.png)
+
+For NYC employers with quarterly payroll greater than \$437,500 (annual rate of \$1.75 million), the rate is increased from 0.34 to 0.60 percent -- a 76.47% increase. According to the effective date section, the payroll tax provisions take effect immediately and "shall apply to tax quarters beginning on or after July 1, 2023".
+
+## Net earnings from self-employment tax
+
+Section 3 of S4008 increased the rate of the net earnings from self-employment tax for business activity in New York City from 0.34 to 0.60 percent (76.47% increase).
+
+Section 2 has a transition rate of 0.47 percent (38.24% increase, or about half of the fully effective increase) that, per the effective date, "shall apply to taxable years beginning on or after January 1, 2023 and before January 1, 2024)". Because most taxpayers are calendar-year taxpayers, this mostly will apply to net self-employment earnings earned in calendar year 2023.
+
+Neither section changes the \$50,000 threshold for taxability.
+
+The relevant bill language is below:
+
+![](images/image-1729320562.png)
+
+## Payment of the tax increase
+
+### Payroll tax increase
+
+Per [Publication 420](https://www.tax.ny.gov/pdf/publications/mctmt/pub420.pdf), under current law:
+
+-   All employers file quarterly returns due at the end of the month following a calendar quarter (e.g., April 30 for the Jan-Mar quarter).
+
+-   Small employers generally pay tax for the quarter when they file the return.
+
+-   Larger employers generally either are required or choose to pay tax under PromtTax, with payments made on the same dates that withholding tax payments are made.
+
+Rules specific to the PMT and how to avoid underpayment penalty are [here](https://www.tax.ny.gov/bus/mctmt/prompt.htm). The PromptTax withholding tax payment rules are [here](https://www.tax.ny.gov/bus/prompt/wt/wttoc2005.htm), with more details [here](https://www.tax.ny.gov/pdf/current_forms/promptax/tr370n.pdf). The withholding tax payment dates are based on business payroll dates, with payment and filing required **three business days following the payroll date**.
+
+Large employers generally have business payroll periods that are biweekly or semi-monthly -- in other words about every 2 weeks. Thus, we should expect the payroll tax increase to start showing up in the 3rd week of June with some ramping up thereafter. I'll try to figure out a reasonable phase-up schedule. I'd expect more settling up at the end of the July-Sept quarter, at end of October (maybe showing in November collections) although I don't have a guess yet as to how much larger than usual it will be. After that, I'd expect the increase to be fully phased in.
+
+### Net earnings from self-employment tax increase
+
+Here's my interpretation. I need to verify with the Tax Department.
+
+There are no special tax payment provisions in the bill, so I would expect payments for 2023 tax years to be based on the normal payment rules for the personal income tax. (See NYS Tax [Publication 420](https://www.tax.ny.gov/pdf/publications/mctmt/pub420.pdf), p.19.) Calendar-year taxpayers make estimated payments on April 15, June 15, September 15, and January 15, and then settle up when they file their final return by the subsequent April 15. If they file an extended return, they need to make an estimated final payment on April 15 nonetheless. Most taxpayers are calendar-year taxpayers and there would not be large off-cycle payments for other tax years, but there would be some.
+
+Each payment is supposed to be one-quarter of the tax due for the year. In practice this implies catching up so that the April payment should be 25% of the annual estimate at that time, the June payment should be the amount needed to make April + June equal to 50% of the annual estimate at that time, and so on. There are safe harbors for estimated payments, which generally require taxpayers to pay 90% of actual liability to avoid penalty interest (the rules are quite complex but this is the general case). This would be true for current-law tax and also for the increase.
+
+This suggests that the first payment could be as soon as June 15 if the Tax Department alerted taxpayers in time. For now, I am assuming that's not practical and that the first payment will be September 15 and will include estimated liability through September. If self-employment income is earned evenly through the year, a September payment might reasonably be expected to be 9/12 \* 90% of annual liability attributable to the tax increase. Thus, 9/12 \* 90% \* (0.47 - 0.34) / 0.34 of a full year of current tax to the extent it is attributable to New York City -- i.e., 25.8% of the portion of annual tax attributable to NYC.
+
+## Drafting errors
+
+Per Kevin Willens 5/31/2023:
+
+> Apparently the legislation had some drafting mistakes that will need correcting next year. First the self-employed PMT outside of NYC inadvertently is repealed effective 1/1/24. I am told that will be fixed retroactively in next year's budget. Also, there were no provisions setting forth an allocation of payroll between NYC and the rest of the MTA region (as I understand it). DOB says it's small amount of money and will be fixed next year but not retroactively.
