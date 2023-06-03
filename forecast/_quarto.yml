@@ -39,7 +39,9 @@ book:
     - econforecasts.qmd
     - forecast_wageprep.qmd
     - pmt_forecast.qmd
+    - nese.qmd
     - law.qmd
+    - consolidated_forecast.qmd
     # - todo.qmd
     # - part: "Baseline"
     #   chapters:

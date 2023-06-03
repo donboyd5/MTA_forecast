@@ -1,0 +1,738 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Consolidated forecast
+
+This section prepares full forecasts. Forecasts in earlier sections should be considered exploratory only.
+
+## Assumptions
+
+There is a conservative forecast and a more optimistic forecast. Here are the assumptions they have in common, and the differences:
+
+-   Payroll tax
+
+    -   Quarterly tax collections under current law are driven by wages
+    
+        -   The conservative forecast 
+        
+        -   The optimistic forecast assumes constant year-over-year growth in wages, beginning with the 2nd quarter of 2023:
+        
+            -   x% in NYC, based on...
+            
+            -   y% in the suburban counties, based on...
+            
+        -   In each case, NYC and suburban county wages are forecast separately, and then added to get MTA wages
+            
+    -   The 2023 increse
+
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+
+```
+
+```{=html}
+<!-- links
+
+
+-->
+```
+
+
+```{r}
+#| label: constants
+#| eval: true
+#| include: false
+
+source_qcew <- "Source: QCEW, obtained from NYSDOL"
+source_pmt <- "Source: Tax Department OpenData, with adjustments"
+
+x90 <- theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+# prepare forecast dates 2023q2 through end of CY 2029
+(fcdates <- seq.Date(as.Date("2023-04-01"), by="3 months", length.out = 27) |> yearquarter())
+
+# growth rates for simple growth rate approach
+nycgr <- .055 # based on IBO, etc.
+suburbangr <- .05 # 0.5% less than nyc, based on history
+
+
+```
+
+## Wage forecasts
+
+The wage forecasts drive the payroll portion of the PMT forecast, so it is important to examine them.
+
+```{r}
+#| label: wage-forecast-model
+#| eval: true
+#| include: false
+
+wages <- readRDS(here::here("data", "wagemta_histest.rds"))
+glimpse(wages)
+summary(wages |> as_tibble() |> mutate(date=as.Date(date))) # 2010q1 - 2023q1 
+count(wages, region) # nyc suburban mta
+
+wagemods <- wages |> 
+  arrange(date) |> 
+  mutate(covid=date %in% yearquarter(c("2020-04-01", "2020-07-01"))) |> 
+  as_tsibble(key=region, index=date) |> 
+  model(
+    wage_prophet = prophet(pmtwage ~ covid + season(period="year", order=4, type = "multiplicative"))
+  )
+
+wagemods |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmtwage) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr)), .by=c(region, .model)) |> 
+  pivot_wider(names_from = .model, values_from = mape) |> 
+  select(region, wage_prophet, everything())
+
+# df2 |> components()
+
+newdata <- crossing(region=c("nyc", "suburban", "mta"), date=fcdates) |> 
+  mutate(covid=FALSE) |> 
+  as_tsibble(key=region, index=date)
+newdata
+
+fc <- wagemods %>% 
+  forecast(new_data = newdata)
+
+fcfull <- fc |> 
+  as_tibble() |> 
+  filter(region %in% c("nyc", "suburban")) |> 
+  mutate(type="forecast") |> 
+  select(date, region, type, .model, pmtwage=.mean) |> 
+  pivot_wider(names_from = region, values_from=pmtwage) |> 
+  mutate(mta=nyc + suburban) |> 
+  pivot_longer(-c(date, type, .model), names_to = "region", values_to = "pmtwage")
+
+dfbase <- wagemods |> 
+  augment() |> 
+  mutate(type="history") |> 
+  select(date, region, type, .model, pmtwage)
+
+wagemod_fc <- dfbase |> 
+  as_tibble() |> 
+  bind_rows(fcfull)
+glimpse(wagemod_fc)
+skim(wagemod_fc)
+count(wagemod_fc, date) |> ht(5)
+
+saveRDS(wagemod_fc, here::here("data", "wage_model_consolidated.rds"))
+
+```
+
+
+```{r}
+#| label: wage-forecast-growthrate
+#| eval: true
+#| include: false
+
+# wage growth forecasts
+# create some new wage data
+wages <- readRDS(here::here("data", "wagemta_histest.rds"))
+
+# take a look at average annual growth rates before 2023 (note that inflation was lower then)
+wages |> 
+  arrange(date) |> 
+  mutate(year=year(date)) |> 
+  filter(year < 2023) |> 
+  summarise(pmtwage=sum(pmtwage), .by=c(region, year)) |> 
+  mutate(pchya=pmtwage / lag(pmtwage) - 1, .by=region) |> 
+  summarise(pchya=mean(pchya, na.rm=TRUE), .by=region)
+
+# prepare growth rates
+grates <- tibble(region=c("nyc", "suburban"), grate=c(nycgr, suburbangr))
+
+newqs <- crossing(region=c("nyc", "suburban"), date=fcdates) |> 
+  mutate(type="forecast") |> 
+  left_join(grates, by = join_by(region))
+
+wagegrowth1 <- bind_rows(
+  wages |> filter(region %in% c("nyc", "suburban")) |> mutate(type="history"),
+  newqs) |> 
+  mutate(qtr=quarter(date), # get the quarter (1:4) so that we can group by quarter
+         grate=ifelse(is.na(grate), 0, grate)) |> 
+  arrange(region, qtr, date) |> 
+  group_by(region, qtr) |> 
+  mutate(.model="wage_assumedgrowth",
+         gfactor=cumprod(1 + grate),
+         # get the last value from history in each quarter, which is the base we grow from
+         baseval=last(na.omit(pmtwage)), 
+         baseval=ifelse(is.na(pmtwage), baseval, NA_real_),
+         forecast=ifelse(is.na(pmtwage), baseval * gfactor, pmtwage)) |> 
+  ungroup() |> 
+  arrange(date)
+wagegrowth1 |> filter(region=="suburban")
+ht(wagegrowth1)
+
+wagegrowth <- wagegrowth1 |> 
+  arrange(date) |> 
+  select(date, region, type, .model, forecast) |> 
+  pivot_wider(names_from = region, values_from = forecast) |> 
+  mutate(mta=nyc + suburban) |> 
+  pivot_longer(cols=c(nyc, suburban, mta), names_to = "region", values_to = "pmtwage") |> 
+  select(date, region, type, .model, pmtwage) 
+
+saveRDS(wagegrowth, here::here("data", "wage_assumedgrowth_consolidated.rds"))
+
+
+```
+
+```{r}
+#| label: wage-growth-calc
+#| eval: true
+#| include: false
+
+wagemod <- readRDS(here::here("data", "wage_model_consolidated.rds"))
+wagegrate <- readRDS(here::here("data", "wage_assumedgrowth_consolidated.rds"))
+
+glimpse(wagemod)
+glimpse(wagegrate)
+
+wagefc <- bind_rows(wagemod, wagegrate)
+glimpse(wagefc)
+count(wagefc, region)
+count(wagefc, year(date)) |> ht()
+count(wagefc, .model)
+count(wagefc, type)
+
+saveRDS(wagefc, here::here("data", "wagefc_consolidated.rds"))
+
+
+```
+
+
+```{r}
+#| label: wage-growth-plot
+#| eval: true
+#| include: true
+
+wagefc <- readRDS(here::here("data", "wagefc_consolidated.rds"))
+
+wagefc |> 
+  arrange(date) |> 
+  mutate(pchya=pmtwage / lag(pmtwage, 4) - 1, .by=c(region, .model)) |> 
+  filter(year(date)>=2019) |> 
+  ggplot(aes(date, pchya, colour=.model)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_x_yearquarter(breaks="3 months") +
+  scale_y_continuous(name="% change vs. year ago", 
+                     breaks=seq(-.2, .2, .02),
+                     labels = label_percent(accuracy=1)) +
+  ggtitle("Wage growth, alternative forecasts") +
+  facet_wrap(~region, ncol=1) +
+  theme_bw() +
+  x90
+
+```
+
+
+
+```{r}
+#| label: wage-growth-table
+#| eval: true
+#| include: true
+
+# annual growth rates
+wagefc <- readRDS(here::here("data", "wagefc_consolidated.rds"))
+
+count(wagefc, .model)
+
+wagefc |> 
+  mutate(year=year(date)) |> 
+  summarise(pmtwage=sum(pmtwage), .by=c(.model, region, year)) |> 
+  mutate(pchya=pmtwage / lag(pmtwage) - 1, .by=c(.model, region)) |> 
+  arrange(.model, region, year) |> 
+  filter(year >= 2022) |> 
+  select(-pmtwage) |> 
+  pivot_wider(names_from = .model, values_from = pchya) |> 
+  relocate(wage_prophet, .before = wage_assumedgrowth) |> 
+  group_by(region) |> 
+  gt() |>
+  tab_header(
+    title = html(paste0("Annual wage growth, simple growth rate approach, and facebook prophet model"))
+  ) |>
+  fmt_percent(columns=-c(region, year),
+             decimals=1)
+
+```
+
+
+## PMT forecast
+
+```{r}
+#| label: get-pmtdata
+#| eval: true
+#| include: false
+
+wagefc <- readRDS(here::here("data", "wagefc_consolidated.rds"))
+
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+glimpse(pmt)
+count(pmt, vname, tax)
+
+nese <- pmt |>
+  filter(vname=="pmt_nese_net") |> 
+  select(date, nese=value) |> 
+  arrange(date)
+
+```
+
+### Payroll tax forecast - current law
+
+```{r}
+#| label: pmt-prep
+#| eval: true
+#| include: false
+
+# quarterly wage tax, 2010q1 through 2023q1
+pmtwageq <- pmt |> 
+  filter(vname=="pmt_wage", year(date) >= 2010, date < "2023-04-01") |> 
+  select(date, pmt=value) |> 
+  mutate(date=yearquarter(date)) |> 
+  summarise(pmt=sum(pmt), .by=date)
+
+# 
+count(wagefc, .model)
+
+pmtmodprep <- wagefc |>
+  filter(region=="mta", .model %in% c("wage_assumedgrowth", "wage_prophet")) |> 
+  select(date, type, wagemod=.model, pmtwage) |> 
+  left_join(pmtwageq, by = join_by(date)) |> 
+  arrange(wagemod, date) |> 
+  mutate(date=yearquarter(date),
+         covid=date %in% yearquarter(c("2020-04-01", "2020-07-01")),
+         lpmtwage=log(pmtwage)) |>  # can't use inline transformation with prophet
+  mutate(pmtwage_pch=pmtwage / lag(pmtwage, 4) -1,
+         pmt_pch=pmt / lag(pmt, 4) -1,
+         .by=c(wagemod))
+
+```
+
+
+```{r}
+#| label: pmt-explore
+#| eval: true
+#| include: false
+
+pdata <- pmtmodprep |> 
+  filter(type=="history") |> 
+  select(date, wagemod, pmtwage, pmt) |> 
+  pivot_longer(-c(date, wagemod)) |> 
+  arrange(date) |> 
+  mutate(ivalue=value / mean(value),
+         pchya=value / lag(value, 4) -1,
+         .by=c(wagemod, name))
+
+pdata |> 
+  ggplot(aes(date, ivalue, colour=name)) +
+  geom_line() +
+  geom_point() +
+  scale_x_yearquarter(breaks="3 months") +
+  # scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  ggtitle("PMT wage-tax quarterly forecast under alternative wage-growth forecasts") +
+  facet_wrap(~wagemod) +
+  theme_bw() +
+  x90
+
+pdata |>
+  # filter(year(date)>=2019) |> 
+  ggplot(aes(date, pchya, colour=name)) +
+  geom_line() +
+  geom_hline(yintercept = 0) +
+  geom_point() +
+  scale_x_yearquarter(breaks="3 months") +
+  scale_y_continuous(name="% change vs. year ago", breaks=seq(-1, 1, .02), labels = label_percent()) +
+  ggtitle("PMT wage-tax quarterly growth forecast under alternative wage-growth forecasts") +
+  facet_wrap(~wagemod) +
+  theme_bw() +
+  x90
+
+```
+
+
+
+```{r}
+#| label: fit-tax-quarterly
+#| eval: true
+#| include: false
+
+pmtmods <- pmtmodprep |> 
+  filter(type=="history") |> # drop the forecast years
+  arrange(wagemod, date) |>
+  as_tsibble(key=wagemod, index=date) |>
+  # only estimate prophet because under prior analysis it looks best
+  model(
+    pmtprophet = prophet(pmt ~ pmtwage + covid + season(period="year", order=4, type = "multiplicative"))
+  )
+
+pmtmods |> 
+  augment() |> 
+  mutate(pcterr=.resid / pmt) |> 
+  as_tibble() |> 
+  # summarise(mape=mean(abs(pcterr)), .by=c(.model))
+  summarise(mape=mean(abs(pcterr)), .by=c(wagemod, .model))
+
+# prophet looks best
+
+# df2 |> components()
+count(wagefc, .model)
+
+```
+
+
+
+```{r}
+#| label: tax-forecast
+#| eval: true
+#| include: false
+
+newdata <- pmtmodprep |> 
+  filter(type=="forecast") |> 
+  select(date, wagemod, pmtwage, lpmtwage, covid) |> 
+  as_tsibble(key=wagemod, index=date)
+
+newdata
+
+pmtfc <- pmtmods |> 
+  forecast(new_data=newdata)
+pmtfc
+
+fcfull <- pmtfc |> 
+  as_tibble() |> 
+  mutate(type="forecast") |> 
+  select(date, type, wagemod, .model, pmt=.mean, pmtwage)
+
+dfbase <- pmtmods |> 
+  augment() |> 
+  left_join(pmtmodprep |> 
+              filter(type=="history") |> 
+              select(date, wagemod, pmtwage),
+            by = join_by(wagemod, date)) |> 
+  mutate(type="history") |> 
+  select(date, type, wagemod, .model, pmtwage, pmt)
+
+pmt_histfc <- dfbase |> 
+  as_tibble() |> 
+  bind_rows(fcfull) |> 
+  rename(pmtmod=.model)
+
+glimpse(pmt_histfc)
+ht(pmt_histfc)
+skim(pmt_histfc)
+count(pmt_histfc, pmtmod)
+count(pmt_histfc, wagemod, pmtmod, type)
+
+saveRDS(pmt_histfc, here::here("data", "pmt_wagetax_forecast_consolidated.rds"))
+
+
+```
+
+
+```{r}
+#| label: fit-taxpch-quarterly
+#| eval: true
+#| include: false
+
+pmtmods2 <- pmtmodprep |> 
+  filter(type=="history") |> # drop the forecast years
+  filter(!is.na(pmt_pch)) |> # drop the startup period with missing pch
+  arrange(wagemod, date) |>
+  as_tsibble(key=wagemod, index=date) |>
+  # only estimate prophet because under prior analysis it looks best
+  model(
+    pmtpchprophet = prophet(pmt_pch ~ pmtwage_pch + covid + season(period="year", order=4, type = "multiplicative")),
+    pmtpcharima = ARIMA(pmt_pch ~ pmtwage_pch + covid)
+  )
+
+pmtmods2 |> filter(wagemod=="wage_assumedgrowth") |> select(pmtpcharima) |> report()
+
+pmtmods2 |> 
+  filter(wagemod=="wage_assumedgrowth") |> 
+  pivot_longer(-wagemod) |> 
+  accuracy()
+
+
+pmtmods2 |> 
+  augment() |> 
+  filter(wagemod=="wage_assumedgrowth") |> 
+  select(wagemod, pchmod=.model, date, pmt_pch, .fitted) |> 
+  pivot_longer(c(pmt_pch, .fitted)) |> 
+  ggplot(aes(date, value, colour=name)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~pchmod, ncol=1)
+
+pmtmods2 |> 
+  augment() |> 
+  filter(wagemod=="wage_assumedgrowth") |>
+  ggplot(aes(date, .resid, colour=.model)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  ggtitle("Negative .resid means actual > .fitted")
+
+
+pmtmods2 |> 
+  augment() |> 
+  mutate(err=.resid - pmt_pch) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(err)), 
+            mdnape=median(abs(err)),
+            .by=c(wagemod, .model))
+
+```
+
+
+
+```{r}
+#| label: taxpch-forecast
+#| eval: true
+#| include: false
+
+newdata2 <- pmtmodprep |> 
+  filter(type=="forecast") |> 
+  select(date, wagemod, pmtwage, pmtwage_pch, covid) |> 
+  as_tsibble(key=wagemod, index=date)
+
+newdata2
+
+pmtfc2 <- pmtmods2 |> 
+  forecast(new_data=newdata2)
+pmtfc2
+
+fcfull2 <- pmtfc2 |> 
+  as_tibble() |> 
+  mutate(type="forecast") |> 
+  select(date, type, wagemod, .model, pmt_pch=.mean, pmtwage, pmtwage_pch)
+
+dfbase2 <- pmtmods2 |> 
+  augment() |> 
+  left_join(pmtmodprep |> 
+              filter(type=="history") |> 
+              select(date, wagemod, pmtwage, pmt, pmtwage_pch),
+            by = join_by(wagemod, date)) |> 
+  mutate(type="history") |> 
+  select(date, type, wagemod, .model, pmtwage, pmt, pmtwage_pch, pmt_pch)
+
+pmt_histfc2 <- dfbase2 |> 
+  as_tibble() |> 
+  bind_rows(fcfull2) |> 
+  rename(pmtmod=.model)
+
+glimpse(pmt_histfc2)
+ht(pmt_histfc2)
+# skim(pmt_histfc2)
+count(pmt_histfc2, pmtmod)
+count(pmt_histfc2, wagemod, pmtmod, type)
+
+# TODO: Now, calc pmt level from percent change
+pmt_histfc3 <- pmt_histfc2 |>  
+  mutate(qtr=quarter(date)) |> 
+  arrange(wagemod, pmtmod, qtr, date) |> 
+  group_by(wagemod, pmtmod, qtr) |>
+  mutate(baseval=last(na.omit(pmt)),
+         baseval=ifelse(is.na(pmt), baseval, NA_real_),
+         grate=ifelse(type=="history", 0, pmt_pch),
+         gfactor=cumprod(1 + grate),
+         forecast=ifelse(type=="forecast", baseval * gfactor, pmt)) |> 
+  ungroup()
+
+pmt_histfc3 |> 
+  select(date, type, wagemod, pmtmod, forecast) |> 
+  ggplot(aes(date, forecast, colour=pmtmod)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~wagemod, ncol=1)
+
+pmt_histfc3 |> 
+  select(date, type, wagemod, pmtmod, pmt_pch, pmtwage_pch) |> 
+  pivot_longer(c(pmt_pch, pmtwage_pch)) |> 
+  ggplot(aes(date, value, colour=name)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~wagemod+pmtmod, ncol=2)
+
+## IMPORTANT graph above
+
+
+saveRDS(pmt_histfc3, here::here("data", "pmtpch_wagetax_forecast_consolidated.rds"))
+
+
+```
+
+
+```{r}
+#| label: tax-forecast-show
+#| eval: true
+#| include: false
+
+pmt_histfc <- readRDS(here::here("data", "pmt_wagetax_forecast_consolidated.rds"))
+# count(pmt_histfc, pmtmod)
+
+pdata <- pmt_histfc |> 
+  filter(pmtmod=="pmtprophet") |> 
+  select(date, wagemod, pmtwage, pmt) |> 
+  pivot_longer(-c(date, wagemod)) |> 
+  arrange(date) |> 
+  mutate(ivalue=value / mean(value),
+         pchya=value / lag(value, 4) -1,
+         .by=c(wagemod, name))
+
+pdata |> 
+  filter(year(date) %in% 2019:2027) |>
+  mutate(ivalue=value / mean(value),
+         .by=c(wagemod, name)) |> 
+  ggplot(aes(date, ivalue, colour=name)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept=as.Date("2023-04-15")) +
+  scale_x_yearquarter(name=NULL, breaks="3 months") +
+  scale_y_continuous(name="index", labels = label_comma(accuracy=.01)) +
+  ggtitle("PMT wages and wage-tax indexed to mean value",
+          subtitle="Under alternative wage-growth forecasts") +
+  facet_wrap(~wagemod, ncol=1) +
+  theme_bw() +
+  x90
+
+pdata |>
+  filter(year(date) %in% 2015:2027) |>
+  ggplot(aes(date, pchya, colour=name)) +
+  geom_line() +
+  geom_hline(yintercept = 0) +
+  geom_point() +
+  scale_x_yearquarter(breaks="3 months") +
+  scale_y_continuous(name="% change vs. year ago", breaks=seq(-1, 1, .02), labels = label_percent()) +
+  ggtitle("PMT wage-tax quarterly growth forecast under alternative wage-growth forecasts") +
+  facet_wrap(~wagemod, ncol=1) +
+  theme_bw() +
+  x90
+
+
+pmt_histfc |> 
+  filter(pmtmod=="pmtprophet",  year(date)>=2019) |> 
+  ggplot(aes(date, pmt, colour=wagemod)) +
+  geom_line() +
+  geom_point() +
+  scale_x_yearquarter(breaks="3 months") +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  ggtitle("PMT wage-tax quarterly forecast under alternative wage-growth forecasts") +
+  theme_bw() +
+  x90
+
+pmt_histfc |> 
+  filter(pmtmod=="pmtprophet") |> 
+  arrange(date) |> 
+  mutate(pchya=pmt / lag(pmt, 4) - 1, .by=wagemod) |> 
+  filter(year(date)>=2019) |> 
+  ggplot(aes(date, pchya, colour=wagemod)) +
+  geom_line() +
+  geom_hline(yintercept = 0) +
+  geom_point() +
+  scale_x_yearquarter(breaks="3 months") +
+  scale_y_continuous(name="% change vs. year ago", breaks=seq(-1, 1, .02), labels = label_percent()) +
+  ggtitle("PMT wage-tax quarterly growth forecast under alternative wage-growth forecasts") +
+  theme_bw() +
+  x90
+
+
+
+
+
+
+```
+
+```{r}
+#| label: tax-annual-growth-table
+#| eval: true
+#| include: true
+
+pmt_histfc |> 
+  filter(pmtmod=="pmtprophet") |> 
+  mutate(year=year(date)) |> 
+  summarise(pmt=sum(pmt),
+            .by=c(year, wagemod)) |> 
+  mutate(pchya=pmt / lag(pmt) - 1, .by=wagemod) |> 
+  pivot_wider(names_from = wagemod, values_from = c(pmt, pchya)) |> 
+  filter(year %in% 2022:2029) |> 
+  gt() |> 
+  tab_header(
+    title = html("Estimated current-law PMT wage tax under alternative wage-growth scenarios"),
+    subtitle="$ millions, and percent change"
+  ) |>
+  fmt_number(columns=starts_with("pmt_"),
+             scale=1e-3,
+             decimals=1) |>
+  fmt_percent(columns=starts_with("pchya"), decimals=1)
+
+```
+
+
+### Regional breakdown of the PMT wage-tax forecast with facebook prophet wage forecast
+
+```{r}
+#| label: tax-regional
+#| eval: true
+#| include: true
+
+wageshares <- wagefc |> 
+  filter(.model=="prophet") |> 
+  select(date, region, pmtwage) |> 
+  pivot_wider(names_from = region, values_from = pmtwage) |> 
+  mutate(across(c(nyc, suburban), ~ .x / mta))
+
+pmt_brkdown <- pmt_histfc |> 
+  filter(.model=="prophet", year(date)<2026) |> 
+  select(date, type, wagemod, .model, mta=pmt) |> 
+  left_join(wageshares |> select(date, nyc_share=nyc, suburban_share=suburban),
+            by = join_by(date)) |> 
+  mutate(nyc=mta * nyc_share, 
+         suburban=mta * suburban_share,
+         nyc_increase_unadj=ifelse(date>=yearquarter("2023-07-01"),
+                                   nyc * 1 * .26 / .34,
+                                   0)) |> 
+  relocate(nyc, suburban, nyc_increase_unadj, .after=mta) |> 
+  arrange(wagemod, date)
+
+tabdata <- pmt_brkdown |> 
+  arrange(wagemod, date) |> 
+  mutate(nyc4q_unadj=roll_sumr(nyc_increase_unadj, 4),
+         total=mta + nyc_increase_unadj, .by = c(wagemod),
+         total4q=roll_sumr(total, 4)) |> 
+  relocate(nyc4q_unadj, nyc_share, suburban_share, .after=total4q)
+
+tabdata |> 
+  filter(year(date)>=2023) |> 
+  select(-c(type, .model, suburban_share)) |> 
+  rename(nyc_share_current=nyc_share) |> 
+  gt() |> 
+  tab_header(
+    title = html("Estimated PMT wage tax under alternative wage forecasts"),
+    subtitle="$ millions, regional, with UNADJUSTED NYC increase (will be lower)"
+  ) |>
+  fmt_number(columns=mta:nyc4q_unadj,
+             scale=1e-3,
+             decimals=1) |>
+  fmt_percent(columns=nyc_share_current, decimals=1)
+
+
+```
+
+
+
+

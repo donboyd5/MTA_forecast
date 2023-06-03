@@ -398,6 +398,27 @@ pmtmq |>
 
 ```
 
+### Levels - decomposition
+
+```{r}
+#| label: decomp
+#| eval: true
+#| include: true
+
+decomp <- pmtwagets |>
+  rename(pmt=value) |> 
+  model(STL(pmt ~ season(window = 13)))
+components(decomp)
+
+components(decomp) |> 
+  autoplot() +
+  scale_y_continuous(name="$ millions",
+                     labels = label_comma(accuracy=1, scale=1e-3)) +
+  theme_bw()
+
+```
+
+
 ### Levels - seasonal patterns
 
 ```{r}
