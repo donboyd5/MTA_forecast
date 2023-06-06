@@ -328,7 +328,7 @@ pmtmodprep <- wagefc |>
 ```{r}
 #| label: pmt-explore
 #| eval: true
-#| include: false
+#| include: true
 
 pdata <- pmtmodprep |> 
   filter(type=="history") |> 
@@ -449,7 +449,7 @@ saveRDS(pmt_histfc, here::here("data", "pmt_wagetax_forecast_consolidated.rds"))
 ```{r}
 #| label: tax-forecast-show
 #| eval: true
-#| include: false
+#| include: true
 
 pmt_histfc <- readRDS(here::here("data", "pmt_wagetax_forecast_consolidated.rds"))
 # count(pmt_histfc, pmtmod)
@@ -527,7 +527,7 @@ pmt_histfc |>
 ```{r}
 #| label: fit-taxpch-quarterly
 #| eval: true
-#| include: false
+#| include: true
 
 pmtmods2 <- pmtmodprep |> 
   filter(type=="history") |> # drop the forecast years
@@ -582,7 +582,7 @@ pmtmods2 |>
 ```{r}
 #| label: taxpch-forecast
 #| eval: true
-#| include: false
+#| include: true
 
 newdata2 <- pmtmodprep |> 
   filter(type=="forecast") |> 
@@ -671,7 +671,7 @@ saveRDS(pmt_histfc4, here::here("data", "pmtpch_wagetax_forecast_consolidated.rd
 ```{r}
 #| label: taxconstant-forecast
 #| eval: true
-#| include: false
+#| include: true
 
 pmtconst1 <- pmtmodprep |> 
   filter(wagemod=="wage_assumedgrowth") |>
@@ -730,7 +730,7 @@ saveRDS(pmtconst3, here::here("data", "pmtpchconstant_wagetax_forecast_consolida
 ```{r}
 #| label: tax-forecast-show2
 #| eval: true
-#| include: false
+#| include: true
 
 pmt_levels <- readRDS(here::here("data", "pmt_wagetax_forecast_consolidated.rds"))
 # 1 wage_assumedgrowth pmtprophet    80

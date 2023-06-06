@@ -59,35 +59,3 @@ Also [this](https://www.ibo.nyc.ny.us/iboreports/modest-economic-recovery-with-p
 > ...IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
 >
 > IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
-
-## Related fiscal forecasts
-
-The base of the New York City Unincorporated Business Tax overlaps considerably with the . In the [Mayor's budget](https://www.nyc.gov/assets/omb/downloads/pdf/exec23-rfpd.pdf) . (See below.) Growth rates
-
-![](images/image-778047321.png)
-
-From NYC OMB [forecasting documentation](https://www.nyc.gov/assets/omb/downloads/pdf/methodology-2018-01.pdf):
-
-![](images/image-636972318.png)
-
-![](images/image-1943477743.png)
-
-![](images/image-1063302610.png)
-
-Here is what the City Council says in their May 22, 2023 Economic and Tax Revenue Forecast [report](https://council.nyc.gov/budget/wp-content/uploads/sites/54/2023/05/Economic-and-Tax-Revenue-Forecast-2.pdf):
-
-![](images/image-1274114317.png)
-
-![](images/image-2013003545.png)
-
-Note that according to the City Council's table below, the UBT grew 22.6% in CFY 2022. (It's not clear if this spike is consistent with what we see in PMT self-employment tax collections - timing differences might mean they are consistent.)
-
-![](images/image-1109688428.png)
-
-Here are NYC IBO projections from their report:
-
-![](images/image-951042658.png)
-
-## Summary of UBT forecasts
-
-![](images/image-240976157.png)

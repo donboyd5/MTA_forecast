@@ -119,8 +119,6 @@ download.file(url, destfile=fpath, mode="wb")
 
 # create bulk filenames
 
-
-
 # representative file names for each fiscal year: ----
 # 2023
 #  https://www.tax.ny.gov/research/collections/march-2023-tax-collections.xls
@@ -722,10 +720,104 @@ p <- df2 |>
   theme(legend.title=element_blank())
 p
 
+```
 
 
+## Compare to MTA's pmt data
+
+```{r}
+#| label: comparison
+#| eval: true
+#| include: false
+
+
+# read the time series of tax receipts data.
+# I received a workbook from David Keller on June 5, 2023 that  had actual MTA receipts of PMT by month, which I transposed and stacked to create a time series.
+
+fn <- "PMT Forecast 23JFP_djb.xlsx"
+receipts1 <- read_excel(here::here("data", "mta", fn),
+                        sheet="PMT 2023",
+                        range="B64:D117")
+receipts2 <- receipts1 |> 
+  mutate(date=paste0(year, "-", mabbr, "-", "01") |> as.Date(format="%Y-%b-%d"))
+
+
+pmt1 <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+count(pmt1, vname)
+
+pmt2 <- pmt1 |> 
+  filter(vname %in% c("pmt_nese_net", "pmt_wage")) |> 
+  select(date, vname, value) |> 
+  pivot_wider(names_from = vname) |> 
+  select(date, pmtwage=pmt_wage, pmtnese=pmt_nese_net) |> 
+  arrange(date) |> 
+  mutate(pmttot=pmtwage + pmtnese,
+         pmttotlag=lag(pmttot))
+
+pmt3 <- pmt2 |> 
+  filter(date %in% receipts2$date) |> 
+  pivot_longer(-date) |> 
+  mutate(type="collections",
+         value=value / 1000)
+
+comp <- receipts2 |>
+  select(date, value=pmt) |> 
+  mutate(name="pmttot", type="receipts") |> 
+  bind_rows(pmt3)
+
+comp |> 
+  filter(name=="pmttot") |> 
+  pivot_wider(names_from = "type") |> 
+  arrange(date)
 
 ```
 
 
+```{r}
+#| label: comparison-results
+#| eval: true
+#| include: true
+
+
+comp |> 
+  filter(name=="pmttot") |> 
+  ggplot(aes(date, value, colour=type)) +
+  geom_line(linewidth=.75) +
+  geom_point() +
+  scale_y_continuous(name="$ millions", limits = c(0, 225)) +
+  scale_x_date(name="Year-month", date_labels = "%Y-%b", breaks="3 months") +
+  ggtitle("MTA PMT receipts and Tax Department total PMT collections (wage tax + self-employment earnings tax)",
+          subtitle = "Vertical axis truncated to exclude Dec 2020 receipts of $614m") +
+  theme_bw() +
+  x90
+
+comp |> 
+  filter((name=="pmttot" & type=="receipts") |
+           (name=="pmttotlag" & type=="collections")) |> 
+  ggplot(aes(date, value, colour=type)) +
+  geom_line(linewidth=.75) +
+  geom_point() +
+  scale_y_continuous(name="$ millions", limits = c(0, 225)) +
+  scale_x_date(name="Year-month", date_labels = "%Y-%b", breaks="3 months") +
+  ggtitle("MTA PMT receipts and 1-month lag of Tax Department total PMT collections (wage tax + self-employment earnings tax)",
+          subtitle = "Vertical axis truncated to exclude Dec 2020 receipts of $614m") +
+  theme_bw() +
+  x90
+
+comp |> 
+  filter(month(date) %in% c(12, 1) & name=="pmttot" & type=="receipts" |
+           month(date) %in% c(11, 12) & name=="pmttot" & type=="collections",
+         date != "2019-01-01") |> 
+  select(-name) |> 
+  mutate(type=ifelse(type=="receipts", "rec", "coll"),
+         year=ifelse(month(date)==1, year(date) -1, year(date)),
+         month=month.abb[month(date)] |> str_to_lower()) |> 
+  select(-date) |> 
+  pivot_wider(names_from = c(type, month)) |> 
+  mutate(rec_decjan=rec_dec + rec_jan,
+         coll_novdec=coll_nov + coll_dec)
+
+
+
+```
 
