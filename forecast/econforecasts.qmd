@@ -59,3 +59,29 @@ Also [this](https://www.ibo.nyc.ny.us/iboreports/modest-economic-recovery-with-p
 > ...IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
 >
 > IBO's economic outlook after 2024 is characterized by modest but steady growth in employment and wages, and lower inflation rates. With that backdrop, IBO expects all major PIT components to grow in that period. IBO forecasts withholdings to grow by 4.4 percent on an average annual basis, reaching \$13.3 billion in 2027. IBO also projects a strong growth in quarterly estimated payments and final returns, reaching \$1.8 billion and \$571 million, respectively, in 2027.
+
+## NYS DOB updated economic forecast for enacted budget
+
+The updated DOB economic forecast is in the AIS [continuing disclosure document](https://www.budget.ny.gov/pubs/archive/fy24/ais/2023-ais-mar.pdf). The document is dated March 8, 2023 on its cover page, and the [web landing page](https://www.budget.ny.gov/investor/ais/ALTaccessAgree2.html) says it is "Issued 04/07/2023".
+
+### National economy
+
+#### March 8, 2023 update
+
+p.95
+
+![](images/image-183757176.png)
+
+#### Executive budget as amended
+
+![](images/image-1354832211.png)
+
+## New York economy
+
+March 8, 2023 update p.97
+
+![](images/image-765307591.png)
+
+Executive budget as amended p.99
+
+![](images/image-1288426810.png)

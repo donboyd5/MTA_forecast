@@ -115,6 +115,9 @@ download.file(url, destfile=fpath, mode="wb")
 #| eval: false
 #| include: false
 
+# landing page:
+#   https://www.tax.ny.gov/research/collections/monthly_tax_collections.htm
+
 # https://www.tax.ny.gov/research/collections/february-2023-tax-collections.xls
 
 # create bulk filenames

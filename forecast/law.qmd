@@ -42,7 +42,7 @@ Per [Publication 420](https://www.tax.ny.gov/pdf/publications/mctmt/pub420.pdf),
 
 -   Small employers generally pay tax for the quarter when they file the return.
 
--   Larger employers generally either are required or choose to pay tax under PromtTax, with payments made on the same dates that withholding tax payments are made.
+-   Larger employers generally either are required or choose to pay tax under PrompTax, with payments made on the same dates that withholding tax payments are made.
 
 Rules specific to the PMT and how to avoid underpayment penalty are [here](https://www.tax.ny.gov/bus/mctmt/prompt.htm). The PromptTax withholding tax payment rules are [here](https://www.tax.ny.gov/bus/prompt/wt/wttoc2005.htm), with more details [here](https://www.tax.ny.gov/pdf/current_forms/promptax/tr370n.pdf). The withholding tax payment dates are based on business payroll dates, with payment and filing required **three business days following the payroll date**.
 

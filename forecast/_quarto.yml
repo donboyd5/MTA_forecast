@@ -33,7 +33,7 @@ book:
   date-format: long
   chapters:
     - index.qmd
-    - clean_tax_data.qmd
+    - get_and_clean_tax_data.qmd
     - get_econ_data.qmd
     - explore.qmd
     - econforecasts.qmd
