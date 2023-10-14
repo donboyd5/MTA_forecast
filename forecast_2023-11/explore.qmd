@@ -1,0 +1,552 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# Explore the data
+
+Before we forecast, we expore the data.
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+```
+
+```{=html}
+<!-- links
+
+
+
+
+-->
+```
+
+
+```{r}
+#| label: get-data
+#| eval: true
+#| include: false
+
+wagebase <- readRDS(here::here("data", "mta_wagebase.rds"))
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+
+```
+
+```{r}
+#| label: constants
+#| eval: true
+#| include: false
+
+source_qcew <- "Source: QCEW, obtained from NYSDOL"
+source_pmt <- "Source: Tax Department OpenData, with adjustments"
+
+```
+
+
+## QCEW wage data
+
+The analysis below uses QCEW data obtained from NYSDOL, which is available a bit more quickly than the same QCEW data available from US BLS, in a bit more detail, and a bit more conveniently. It is available from 1990q1 through 2022q4. 
+
+Unlike most publicly available economic time series, the primary QCEW data are not seasonally adjusted. That's good, because tax data are not seasonally adjusted, either, and this allows us to see how seasonal patterns in tax data relate to seasonal patterns in wage data, which can give us insight into lags between economic activity and tax collections.
+
+Sometimes, it helps to smooth non-seasonally adjusted data to see underlying trends better. When I do that I use a simple trailing 4-quarter moving average or a "loess" approach (locally weighted regression). These methods aren't as sophisticated as the seasonal adjustment approach BLS uses but they're more than enough for our purposes. If there's a need, we can use more-sophisticated methods.
+
+NYSDOL QCEW data are available for New York's counties and for the state as a whole. In the graphs below, "nyc" is the sum of the 5 counties in NYC, "suburban" is the sum of the 7 MTA suburban counties, and "mta" is the sum of nyc and suburban.
+
+```{r}
+#| label: get-wagedata
+#| eval: true
+#| include: false
+
+wagebasets <- wagebase |> 
+  # mutate(date=yearmonth(date)) |>
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(key=c(area, name), index = date) 
+
+# tmp <- wagebase   |> 
+#   mutate(date=yearquarter(date)) |> 
+#   as_tsibble(key=c(area, name), index = date) |>  
+#   model(decomp=STL(pmtbase ~ season(window = "periodic"))) # or use a number
+# # plot(tmp)
+# # tmp |> components()
+# tmp |> 
+#   components() |>
+#   filter(name=="totwage") |> 
+#   filter(area=="New York State") |> 
+#   select(date, area, pmtbase, trend, season_year) |> 
+#   pivot_longer(-c(date, area)) |> 
+#   ggplot(aes(date, value)) +
+#   geom_line(colour="blue") +
+#   facet_wrap(~name, ncol=1, scales = "free_y") +
+#   theme_bw()
+# 
+# count(tmp, area)
+# 
+# UKLungDeaths %>% 
+#   model(ETS(mdeaths)) %>% 
+#   components
+
+## get wages for nyc, suburban, and mta total ----
+# count(wagebase, name)
+#   name         n
+#   <chr>    <int>
+# 1 estab     1196
+# 2 mnth1emp  1196
+# 3 mnth2emp  1196
+# 4 mnth3emp  1196
+# 5 totwage   1196
+
+wagemta1 <- wagebase |> 
+  filter(name=="totwage", region %in% c("nyc", "suburban")) |> 
+  summarise(pmtbase=sum(pmtbase), .by=c(date, region))
+
+wagemta2 <- wagemta1 |> 
+  summarise(pmtbase=sum(pmtbase), .by=c(date)) |> 
+  mutate(region="mta")
+
+wagemta <- bind_rows(wagemta1, wagemta2) |> 
+  mutate(region=factor(region, levels=c("nyc", "suburban", "mta")))
+  
+
+```
+
+
+### Levels
+
+Note the pronounced spikes in Q1 wages especially in NYC. There are also smaller Q4 spikes. Among other things, these spikes reflect payment of bonuses and other variable compensation. These tend to be concentrated in finance. They also may reflect holiday-related employment surges and other factors.
+
+```{r}
+#| label: wage-levels-trend
+#| eval: true
+#| include: true
+
+wagemta |> 
+  arrange(date) |> 
+  mutate(smooth=btools::ma(pmtbase, 4), .by=region) |> 
+  pivot_longer(cols=c(pmtbase, smooth)) |> 
+  filter(year(date) >= 2010) |> 
+  ggplot(aes(date, value, colour=name)) +
+  geom_line() +
+  geom_point() +
+  scale_colour_manual(values=c("blue", "green")) +
+  scale_x_yearquarter(name=NULL, breaks = "3 months", expand = expansion(mult = .02)) +
+  scale_y_continuous(name="$ billions",
+                     labels=label_comma(scale=1e-9, accuracy=1)) +
+  facet_wrap(~region, ncol=1, scales = "free_y") +
+  ggtitle("PMT wages, NYC, MTA suburban counties, and MTA total",
+          subtitle="Raw data (not seasonally adjusted) and 4-quarter trailing moving average") +
+  theme_bw(base_size = 10) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  labs(caption=source_qcew) + caption_left
+  
+  
+```
+
+### Levels - seasonal patterns
+
+In NYC, Q1 is the largest quarter by far, followed by Q4. This generally is driven by the financial sector (I have not examined sectoral detail in this analysis). In the suburban counties, Q4
+
+```{r}
+#| label: wage-season
+#| eval: true
+#| include: true
+
+wagemta |> 
+  filter(year(date) >= 2019) |>  
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(key=region, index=date) |> 
+  gg_season(pmtbase) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ billions",
+                     labels=label_comma(scale=1e-9, accuracy=1)) +
+  labs(x="") +
+  ggtitle("PMT QCEW wages by quarter",
+          subtitle="Not seasonally adjusted") +
+  facet_wrap(~region, ncol=1, scales = "free_y") +
+  theme_bw() +
+  labs(caption=source_qcew) + caption_left
+
+wagemta |> 
+  filter(year(date) %in% 2019:2022) |>  
+  mutate(year=year(date)) |> 
+  mutate(pmtbase=pmtbase / sum(pmtbase), .by=c(region, year)) |> 
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(key=region, index=date) |> 
+  gg_season(pmtbase) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="Quarter as % of calendar year",
+                     breaks=seq(-1, 1, .01),
+                     labels=label_percent(accuracy=1)) +
+  labs(x="") +
+  ggtitle("Quarterly shares of PMT QCEW wages",
+          subtitle="Not seasonally adjusted") +
+  facet_wrap(~region, ncol=1, scales = "fixed") +
+  theme_bw() +
+  labs(caption=source_qcew) + caption_left
+
+```
+
+```{r}
+
+wagemta |> 
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(key=region, index=date) |> 
+  gg_subseries(pmtbase) + 
+  ggtitle("PMT wages over time, by quarter") +
+  theme_bw()
+
+# tourism_melb %>%
+#   gg_subseries(Trips)
+
+```
+
+
+### Growth rates
+
+NYC and suburban MTA county wages. % change year over year.
+
+
+```{r}
+#| label: wage-growth
+#| eval: true
+#| include: true
+#| fig-height: 8
+
+# wagemta |>
+#   arrange(date) |> 
+#   mutate(pch=pmtbase / lag(pmtbase, 4) - 1, .by=region) |> 
+#   filter(year(date) >= 2010) |> 
+#   ggplot(aes(date, pch)) +
+#   geom_line() +
+#   geom_point() +
+#   geom_smooth() +
+#   geom_hline(yintercept = 0) +
+#   # scale_x_yearquarter(name=NULL, breaks = "3 months") +
+#   scale_x_yearquarter(name=NULL, breaks = "3 months", expand = expansion(mult = .02)) +
+#   scale_y_continuous(name="% change from year ago", 
+#                      breaks=seq(-.5, .5, .05),
+#                      labels=label_percent(accuracy=1)) +
+#   facet_wrap(~region, ncol=1) +
+#   ggtitle("Year-over-year % change in PMT wages, NYC, MTA suburban counties, and MTA total") +
+#   theme_bw() +
+#   theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+#   labs(caption=source_qcew) + caption_left
+
+pdata <- wagemta |> 
+  arrange(date) |> 
+  mutate(smooth=btools::ma(pmtbase, 4), .by=region) |> 
+  mutate(across(c(pmtbase, smooth), ~ .x / lag(.x, 4) - 1), .by=region) |> 
+  pivot_longer(cols=c(pmtbase, smooth)) |>
+  filter(year(date) >= 2010)
+
+pdata |> 
+  ggplot(aes(date, value, colour=name)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_colour_manual(values=c("blue", "green")) +
+  scale_x_yearquarter(name=NULL, breaks = "3 months", expand = expansion(mult = .02)) +
+  scale_y_continuous(name="% change versus year ago",
+                     labels=label_percent(accuracy=.1),
+                     breaks=seq(-1, 1, .025)) +
+  facet_wrap(~region, ncol=1, scales = "fixed") +
+  ggtitle("Percent change vs. year ago of PMT wages, NYC, MTA suburban counties, and MTA total",
+          subtitle="Percent change of raw data (not seasonally adjusted) and of 4-quarter trailing moving average") +
+  theme_bw(base_size = 10) +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  labs(caption=source_qcew) + caption_left
+
+```
+
+Growth rates in underlying trend (i.e., 4-quarter moving average of level)
+
+```{r}
+#| label: wage-trendgrowth
+#| eval: true
+#| include: true
+#| fig-height: 6
+#| fig-width: 9
+
+# #| column: page
+# # | column: screen
+# # | out-width: 100%
+# # | fig-format: svg
+
+
+pdata <- wagemta |> 
+  # filter(region=="suburban") |> 
+  arrange(date) |> 
+  group_by(region) |> 
+  # mutate(smooth = predict(loess(pmtbase ~ row_number(), span=0.25))) |> 
+  mutate(smooth=btools::ma(pmtbase, 4)) |> 
+  mutate(pch=smooth / lag(smooth, 4) - 1) |>
+  ungroup() |> 
+  filter(year(date) >= 2010)
+
+pdata |> 
+  ggplot(aes(date, pch, colour=region)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_x_yearquarter(name=NULL, breaks = "3 months", expand = expansion(mult = .02)) +
+  scale_y_continuous(name="% change from year ago", 
+                     breaks=seq(-.5, .5, .01),
+                     labels=label_percent(accuracy=.1)) +
+  ggtitle("Year-over-year % change in 4-quarter trailing average of PMT wages",
+          subtitle="NYC, MTA suburban counties, and MTA total") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  labs(caption=source_qcew) + caption_left
+
+
+```
+
+
+
+
+### NYC share of MTA-region wages
+
+```{r}
+#| label: nycshare
+#| eval: true
+#| include: true
+
+wagemta |>
+  pivot_wider(names_from=region, values_from=pmtbase) |> 
+  mutate(nycshare=nyc / mta) |>
+  filter(year(date) %in% 2017:2022) |> 
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_season(nycshare) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="% of PMT wage base", breaks=seq(.7, .9, .01), labels = label_percent()) +
+  labs(x="") +
+  ggtitle("Seasonality of NYC share of PMT QCEW wage base") +
+  theme_bw() +
+  labs(caption=source_qcew) + caption_left
+
+```
+
+
+
+## Tax data
+
+Here we look at the payroll tax data from the Tax Department.
+
+### Levels
+
+```{r}
+#| label: get-taxdata
+#| eval: true
+#| include: false
+
+pmtwage <- pmt |> 
+  filter(vname=="pmt_wage", year(date) >= 2010) |> 
+  arrange(date)
+
+pmtwageq <- pmt |> 
+  filter(vname=="pmt_wage") |> 
+  mutate(date=yearquarter(date)) |> 
+  summarise(pmt=sum(value), .by=date) |> 
+  filter(year(date)>=2010)
+
+pmtwagets <- pmtwage |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index = date) 
+
+```
+
+
+This graph shows monthly collections at quarterly rates, and actual quarterly collections
+
+```{r}
+#| label: tax-levels
+#| eval: true
+#| include: true
+
+pmtmq <- bind_rows(pmtwage |> select(date, pmt=value) |> 
+                     mutate(period="monthly",
+                            pmt=pmt), # quarterly rate
+                   pmtwageq |> mutate(date=as.Date(date),
+                                      period="quarterly",
+                                      pmt=pmt / 3) |> # monthly rate
+                     filter(date!="2023-04-01"))
+
+pmtmq |> 
+  ggplot(aes(date, pmt, colour=period)) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_x_date(breaks=seq.Date(as.Date("2010-01-01"), as.Date("2023-04-01"), by="3 months"),
+               expand = expansion(mult = c(.02, .02))) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 1e6, 25e3), labels = label_comma(scale=1e-3)) +
+  labs(x="") +
+  ggtitle("PMT collections - monthly revenue, and average monthly revenue per quarter",
+          subtitle = "Quarters are placed at the month they start in") +
+  theme_bw()  +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5)) +
+  labs(caption=source_pmt) + caption_left
+
+
+```
+
+### Levels - decomposition
+
+```{r}
+#| label: decomp
+#| eval: true
+#| include: true
+
+decomp <- pmtwagets |>
+  rename(pmt=value) |> 
+  model(STL(pmt ~ season(window = 13)))
+components(decomp)
+
+components(decomp) |> 
+  autoplot() +
+  scale_y_continuous(name="$ millions",
+                     labels = label_comma(accuracy=1, scale=1e-3)) +
+  theme_bw()
+
+```
+
+
+### Levels - seasonal patterns
+
+```{r}
+#| label: pmt-season
+#| eval: true
+#| include: true
+
+pmtwage |> 
+  select(date, pmt=value) |> 
+  filter(year(date) >= 2019, date <="2023-03-01") |>  
+  mutate(date=yearquarter(date)) |> 
+  summarise(pmt=sum(pmt), .by=date) |> 
+  as_tsibble(index=date) |> 
+  gg_season(pmt) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions",
+                     labels=label_comma(scale=1e-3, accuracy=1)) +
+  labs(x="") +
+  ggtitle("PMT revenue collections by quarter",
+          subtitle="Not seasonally adjusted") +
+  theme_bw() +
+  labs(caption=source_pmt) + caption_left
+
+pmtwage |> 
+  select(date, pmt=value) |> 
+  filter(year(date) %in% 2019:2022) |>  
+  mutate(date=yearquarter(date)) |> 
+  summarise(pmt=sum(pmt), .by=date) |>   
+  mutate(year=year(date)) |> 
+  mutate(pmt=pmt / sum(pmt), .by=c(year)) |> 
+  mutate(date=yearquarter(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_season(pmt) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="Quarter as % of calendar year",
+                     breaks=seq(-1, 1, .01),
+                     labels=label_percent(accuracy=1)) +
+  labs(x="") +
+  ggtitle("PMT revenue collections by quarter",
+          subtitle="Not seasonally adjusted") +
+  theme_bw() +
+  labs(caption=source_pmt) + caption_left
+
+```
+
+
+```{r}
+#| label: pmt-season-v2
+#| eval: true
+#| include: true
+
+pmtwage |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_subseries(value) + 
+  ggtitle("PMT wage-tax revenue collections over time, by month") +
+  theme_bw()
+
+pmtwage  |>
+  filter(date < as.Date("2023-04-01")) |> 
+  mutate(date=yearquarter(date))  |> 
+  summarise(value=sum(value), .by=date) |> 
+  as_tsibble(index=date) |> 
+  gg_subseries(value) + 
+  geom_line(colour="darkgreen", linewidth=1) +
+  geom_point() +
+  scale_x_yearquarter(name=NULL, breaks="1 year", labels=label_date(format="%Y")) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 1e3, 100)*1000, labels = label_comma(scale=1e-3)) +
+  ggtitle("PMT wage-tax revenue collections over time, by quarter") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+
+```
+
+## Autocorrelation
+
+```{r}
+#| label: pmt-autocorr
+#| eval: true
+#| include: true
+
+
+pmtwage |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) %>%
+  ACF(value) %>%
+  autoplot() +
+  ggtitle("PMT wage-tax revenue collections, autocorrelation with prior months",
+          "Horizontal axis is lag in number of months. Vertical axis is correlation between current month and lagged month") +
+  theme_bw()
+
+# tourism_melb %>%
+#   ACF(Trips) %>%
+#   autoplot()
+
+```
+
+
+
+
+
+### Growth rates
+
+
+
+```{r}
+#| label: tax-seasonality
+#| eval: true
+#| include: true
+
+
+pmtwagets |> 
+  filter(year(date) %in% 2019:2023) |> 
+  select(date, value) |> 
+  gg_season(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  labs(x="") +
+  ggtitle("Seasonality of payroll mobility tax collections (wage tax only)") +
+  theme_bw()
+
+
+```
+
+
+
+

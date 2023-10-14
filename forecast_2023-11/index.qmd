@@ -1,0 +1,34 @@
+# Introduction
+
+
+## Overview
+
+-   Forecast pre-July-law PMT wage tax as a function of wages - quarterly then convert to monthly
+
+    - Develop separate wage forecasts for NYC and suburban counties, based on (1) review of available forecasts and (2) time-series approaches
+    
+    -   Convert the quarterly wage forecasts into monthly based on historical patterns
+    
+    -   Split the monthly wage tax into NYC and suburban components, based on splits in the quarterly wage data
+    
+-   Forecast monthly July+ PMT wage tax by estimating the additional NYC tax
+
+    -   Start with monthly NYC wage tax estimates from above
+    
+    -   Estimate increase in NYC, allowing for some slippage in July
+
+
+## Steps
+
+-   Get and clean historical PMT and related data
+
+-   Get and clean economic data
+
+-   Examine recent trends
+
+-   Forecast revenue **collections**
+
+For **deposits to MMTOA**, assume payroll tax is lagged one month, and net self-employment earnings tax is on the PIT estimated payment schedule (see discussion in the 2023 tax increase section).
+
+
+

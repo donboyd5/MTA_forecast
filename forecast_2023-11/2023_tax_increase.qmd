@@ -1,0 +1,109 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# The 2023 PMT tax increase
+
+## The legislation
+
+NYS increased the PMT as follows (see [transportation bill](https://legislation.nysenate.gov/pdf/bills/2023/S4008C))
+
+-   Payroll tax rate on NYC employers with quarterly payroll greater than \$437,500 (annual rate of \$1.75 million)
+
+    -   increased from 0.34% to 0.60% (+76.47%).
+
+    -   payroll tax provisions take effect immediately and "shall apply to tax quarters beginning on or after July 1, 2023"
+
+-   Self-employment net earnings tax rate on NYC net earnings was increased:
+
+    -   from 0.34% to 0.47% (+38.24%) for TY beginning in 2023 (because most taxpayers are calendar-year taxpayers, this mostly will apply to net self-employment earnings earned in calendar year 2023)
+
+    -   from 0.34% to 0.60% (+76.47%) for TY beginning in 2024+.
+
+The \$50,000 threshold for taxability was not changed
+
+## Fiscal impact estimates
+
+During budget process:
+
+-   Full-year \~\$1.1 billion
+
+-   First year: DOB estimate was \~\$460m, KW believes
+
+Boyd estimates in June 2023
+
+-   2023 (conservative to optimistic) \$407-419m -- (\$381-393 wages, \~\$26 self-employment)
+
+-   2024 (conservative to optimistic) \$1,038-1089m - (\$979-1,024 wages, \~\$59-66 self-employment)
+
+MTA July Financial Plan
+
+-   2023: \$419m
+
+-   2024: \$1,112m (+ \~4% annually in later years)
+
+## When will the payroll tax increase be paid?
+
+Per [Publication 420](https://www.tax.ny.gov/pdf/publications/mctmt/pub420.pdf), under current law:
+
+-   All employers file quarterly returns due at the end of the month following a calendar quarter (e.g., April 30 for the Jan-Mar quarter).
+
+-   Small employers generally pay tax for the quarter when they file the return.
+
+-   Larger employers generally either are required or choose to pay tax under PrompTax, with payments made on the same dates that withholding tax payments are made.
+
+Rules specific to the PMT and how to avoid underpayment penalty are [here](https://www.tax.ny.gov/bus/mctmt/prompt.htm). The PromptTax withholding tax payment rules are [here](https://www.tax.ny.gov/bus/prompt/wt/wttoc2005.htm), with more details [here in Form TR370N](https://www.tax.ny.gov/pdf/current_forms/promptax/tr370n.pdf). The withholding tax payment dates are based on business payroll dates, with payment and filing required **three business days following the payroll date**.
+
+Large employers generally have business payroll periods that are biweekly or semi-monthly -- in other words about every 2 weeks. Thus, we should expect the payroll tax increase to start showing up in the 3rd week of June with some ramping up thereafter. I'll try to figure out a reasonable phase-up schedule. I'd expect more settling up at the end of the July-Sept quarter, **at end of October (maybe showing in November collections)** although I don't have a guess yet as to how much larger than usual it will be. After that, I'd expect the increase to be fully phased in.
+
+### Conversation with Amanda Hiller
+
+I spoke with Amanda Hiller, acting commissioner and general counsel at the Tax Department, on 10/13/2023. She said many large multi-location employers pay all of their payroll taxes with a single lump-sum check. For example, let's say Walmart has locations in the MTA region and elsewhere in the state, and it owes income tax withholding it has collected in trust from its employees, as well as unemployment insurance taxes and the PMT payroll tax. It might send the state a single check (or other form of payment) to cover all of these taxes, along with a computerized list of covered employees, and the state would have to split the payment in some way among the taxes. She said they won't really know until income tax returns are filed in April how much of the payment is for PMT versus other taxes.
+
+I am not sure how confident I am in this and would like to understand the process in detail. Amanda was not familiar with details of the distribution process, and did not give me the name of a Tax Department employee I should talk to. She suggested the right protocol for that would be for the MTA to ask DOB, and for DOB to ask the Tax Department.
+
+I reached out to Laura Schultz, who is the new head of DOB's fiscal unit (that makes her a high-level manager right below the deputy budget director level; she'll wield considerable influence; I know her from her time at the Rockefeller Institute of Government). The email I sent her is below. She got back to me and said she'll check in with her staff on Monday.
+
+> Hi Laura,
+>
+> Congratulations on your new job! It will be exciting, I am sure. No doubt you are already extremely busy.
+>
+> Short story: I hope you can help me talk to someone in DOB who can provide information that will be useful to the MTA about revenue flows associated with this year's increases to the payroll mobility tax. For details, please see below.
+>
+> Many thanks.
+>
+> Don Boyd\
+> Principal, Boyd Research, LLC\
+> Co-Director, State and Local Government Finance Project\
+> Center for Policy Research\
+> Rockefeller College, University at Albany, SUNY\
+> <https://www.linkedin.com/in/donald-boyd-2443276b/>\
+> [donboyd5\@gmail.com](mailto:donboyd5@gmail.com)\
+> [dboyd\@albany.edu](mailto:dboyd@albany.edu)\
+> 518-336-5349
+>
+> **Details**
+>
+> I am doing some work for the MTA in relation to the increases to the payroll mobility tax enacted in May. MTA would like to understand in detail the early revenue flows from these increases and has asked me to learn more. I'm hoping you can provide some advice - particularly about whom to talk to. If you need me to follow a particular protocol - for example, if you need me to ask the MTA to reach out to you to say this is important - please let me know. I do know they reached out to John Walters in DOB's transportation (I do not know him), but I believe that was in relation to depositing questions.
+>
+> Briefly, as you may know, there were two PMT increases adopted with the budget: (1) an increase in the payroll tax, applicable to NYC wages paid on & after July 1 by larger employers, and (2) an increase in the self-employment tax on NYC earnings, with a partial increase (a transition rate) for the 2023 tax year and a higher rate in later years. (Neither increase applies to payroll or earnings in the portion of the MTA outside NYC.)
+>
+> In an effort to understand the likely initial-year cash flow for these two increases, I'd like to understand deeply (1) the processes by which taxpayers were informed of their new obligations, (2) the processes by which payments for the payroll tax are split between multiple taxes in cases where a single employer makes a single payment that covers multiple taxes - as I understand it, in these cases, the Tax Department may make an estimated distribution between taxes (e.g., payroll tax and withholding tax) and reconcile amounts when withholding taxes are reconciled via an annual return, (3) whether processing information associated with early revenue may provide any hints about the extent to which employers are now fully paying the PMT increase or whether we are only seeing partial payment at this point, and (4) whether anyone in DOB or the Tax Department has been analyzing revenue from these taxes and if so whether they might talk to me about what they've been learning.
+
+## When will the net earnings from self-employment tax increase be paid?
+
+Here's my interpretation. I need to verify with the Tax Department.
+
+There are no special tax payment provisions in the bill, so I would expect payments for 2023 tax years to be based on the normal payment rules for the personal income tax. (See NYS Tax [Publication 420](https://www.tax.ny.gov/pdf/publications/mctmt/pub420.pdf), p.19.) Calendar-year taxpayers make estimated payments on April 15, June 15, September 15, and January 15, and then settle up when they file their final return by the subsequent April 15. If they file an extended return, they need to make an estimated final payment on April 15 nonetheless. Most taxpayers are calendar-year taxpayers and there would not be large off-cycle payments for other tax years, but there would be some.
+
+Each payment is supposed to be one-quarter of the tax due for the year. In practice this implies catching up so that the April payment should be 25% of the annual estimate at that time, the June payment should be the amount needed to make April + June equal to 50% of the annual estimate at that time, and so on. There are safe harbors for estimated payments, which generally require taxpayers to pay 90% of actual liability to avoid penalty interest (the rules are quite complex but this is the general case). This would be true for current-law tax and also for the increase.
+
+This suggests that the first payment could be as soon as June 15 if the Tax Department alerted taxpayers in time. I am assuming that's not practical. Therefore **I assume that the first payment will be September 15 and will include estimated liability through September.** If self-employment income is earned evenly through the year, a September payment might reasonably be expected to be 9/12 \* 90% of annual liability attributable to the tax increase. Thus, 9/12 \* 90% \* (0.47 - 0.34) / 0.34 of a full year of current tax to the extent it is attributable to New York City -- i.e., 25.8% of the portion of annual tax attributable to NYC. Given the estimates above, this suggests the **September payment (collected in October, deposited to MMTOA in November) could be about \$15m**.
+
+### Conversation with Amanda Hiller
+
+I spoke with Amanda Hiller, acting commissioner and general counsel at the Tax Department, on 10/11/2023. One thing she had to add is that she thinks most estimated taxpayers generally base payments in June and September, and perhaps January, on what their accountants recommend when they prepare returns for the prior year. (My accountant always gives me estimated tax forms to send in, along with suggested payment amounts. I don't do what he says, though.) Those forms, of course, generally were prepared before the PMT self-employment tax increase was adopted. Thus, she expects much of the increase to be paid in January and April.
+
+That's not how I read the law. I think they're supposed to catch up in September, although I assumed there'd be considerable slippage nonetheless. But her expectation suggests even more slippage.

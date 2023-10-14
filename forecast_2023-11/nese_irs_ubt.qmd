@@ -1,0 +1,70 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# PMT net earnings compared to IRS and UBT concepts
+
+## Net earnings from self-employment
+
+Net Earnings from Self-Employment (NESE) is a term used in the U.S. tax code to define the income that self-employed people receive from their own businesses, after deducting most business expenses. It is essentially the self-employed equivalent of wages for a W-2 employee. It forms the basis for the calculation of self-employment tax (Social Security and Medicare tax for self-employed individuals) and can be found on Schedule SE.
+
+The major components of net earnings from self-employment are as follows:
+
+1.  **Gross Income:** Total amount made from the business before deducting any expenses. It includes sales, service fees, and any other revenue sources related to the business.
+
+2.  **Cost of Goods Sold (COGS):** COGS includes the cost of raw materials and direct labor costs used to produce the goods.
+
+3.  **Business Expenses:** Costs incurred to keep the business running, excluding COGS. Examples include rent or mortgage for business property, utilities, business-related travel, advertising, office supplies, depreciation on business assets, and salaries for employees (not including the owner if a sole proprietor).
+
+4.  **Depreciation and Section 179 Deduction:** Special deductions for long-term assets such as equipment or buildings. Section 179 of the Internal Revenue Code allows a taxpayer to elect to deduct the cost of certain types of property on their income taxes as an expense, rather than requiring the cost of the property to be capitalized and depreciated.
+
+5.  **Self-Employment Tax Deduction:** Self-employed individuals get to deduct the employer-equivalent portion of self-employment tax, calculated as 50% of self-employment tax liability.
+
+6.  **Net Profit or Loss:** Net after deducting business expenses, COGS, depreciation, and the section 179 deduction.
+
+NESE often differs from the profit or loss reported on Schedule C due to various adjustments, like the deduction for 50% of self-employment taxes, self-employed health insurance, contributions to self-employed retirement plans, etc. Net earnings from self-employment is subject to self-employment tax -- i.e., Social Security and Medicare taxes.
+
+## Relationship to S Corporation and Partnership income
+
+Net self-employment income for tax purposes typically refers to income earned by self-employed individuals operating a trade or business as sole proprietors or partners in a partnership. This income is reported on Schedule C of the individual's income tax return and is subject to self-employment tax, which covers Social Security and Medicare taxes.
+
+Income from S Corporations and Limited Liability Companies (LLCs) is a bit different:
+
+-   **S Corporations:** Shareholders of an S Corporation may receive both salary and dividend income. The salary is subject to employment tax and is not considered self-employment income. The dividends are not subject to self-employment tax.
+
+-   **LLCs:** The tax treatment of income from an LLC depends on how the LLC chooses to be taxed. If the LLC is treated as a sole proprietorship (for a single-member LLC) or a partnership (for a multi-member LLC), then the income can be subject to self-employment tax. If the LLC chooses to be treated as a corporation, then it's not self-employment income.
+
+The types of income that qualify as self-employment income generally include any income received from carrying on a trade or business. In the financial services industry, several activities could be conducted in a non-corporate form and generate self-employment income. These can include financial planning, investment advice, private money management, tax planning, and more.
+
+Capital gains typically are not considered self-employment income. They are generally classified as investment income, not earned income from a trade or business, so they are not subject to self-employment tax. There are exceptions to this, such as when dealing with dealer property, or property held primarily for sale to customers in the ordinary course of a trade or business.
+
+## Relationship to the UBT base
+
+The New York City Unincorporated Business Tax (UBT) applies to individuals and unincorporated entities who conduct a trade, business, profession, or occupation wholly or partly within New York City. This tax applies to sole proprietorships, partnerships, and limited liability companies (LLCs) that do not elect to be treated as corporations.
+
+The UBT base is generally calculated as the net income from the unincorporated business, similar to net earnings from self-employment at the federal level. This includes gross income from the business minus allowable deductions.
+
+There are a few key differences between the UBT and net earnings from self-employment for federal tax purposes:
+
+1.  **UBT Deductions:** The UBT allows for deductions that are "directly and exclusively" associated with carrying on the trade or business, while the federal tax code allows for deductions that are "ordinary and necessary." This may create differences in the net income figure between the two tax calculations.
+
+2.  **UBT Tax Credits:** UBT payers may be eligible for certain tax credits specific to New York City, which are not applicable to the federal self-employment tax.
+
+3.  **Exemptions and Thresholds:** The UBT has specific exemptions and income thresholds for taxation. For example, unincorporated businesses with taxable gross income of less than \$95,000 are not subject to UBT. On the federal level, all net earnings from self-employment of \$400 or more are subject to the self-employment tax.
+
+## Estimated payments
+
+Here's the usual schedule for estimated payments:
+
+1.  **1st Payment:** Due on April 15 of the tax year. It covers income earned from January 1 through March 31.
+
+2.  **2nd Payment:** Due on June 15 of the tax year. It covers income earned from April 1 through May 31.
+
+3.  **3rd Payment:** Due on September 15 of the tax year. It covers income earned from June 1 through August 31.
+
+4.  **4th Payment:** Due on January 15 of the following year. It covers income earned from September 1 through December 31.
+
+The annual income tax return filed by April 15 of the following year involves "settling up". These dates can be adjusted if they fall on weekends or holidays.

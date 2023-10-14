@@ -1,39 +1,105 @@
----
-output: html_document
-editor_options: 
-  chunk_output_type: console
----
-# Get economic tax data
 
-```{r}
-#| label: includes
-#| include: false
+# https://fred.stlouisfed.org/series/NYWTOT bea wages nys through q4 2022
+
+# Source: U.S. Bureau of Economic Analysis  Source: Federal Reserve Bank of St. Louis  Release: Personal Income by State  
+# Units:  Thousands of Dollars, Seasonally Adjusted Annual Rate
+# Frequency:  Quarterly
+# Suggested Citation:
+#   U.S. Bureau of Economic Analysis and Federal Reserve Bank of St. Louis, Total Wages and Salaries in New York [NYWTOT], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/NYWTOT, May 27, 2023.
+
+
+# Total Quarterly Wages in New York-Newark-Jersey City, NY-NJ-PA (MSA) (ENUC356230010SA)
+# https://fred.stlouisfed.org/series/ENUC356230010SA
+
+
+# Total Quarterly Wages in New York-Newark-Jersey City, NY-NJ-PA (MSA) [ENUC356230010]
+# Units:  Dollars, Not Seasonally Adjusted
+# Frequency:  Quarterly
+# Total wages are the wages paid by Unemployment Insurance covered employers during the calendar quarter, regardless of when the services were performed. Included in wages are pay for vacation and other paid leave, bonuses, stock options, tips, the cash val
+# Suggested Citation:
+#   U.S. Bureau of Labor Statistics and Federal Reserve Bank of St. Louis, Total Quarterly Wages in New York-Newark-Jersey City, NY-NJ-PA (MSA) [ENUC356230010], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/ENUC356230010, May 28, 2023.
+# https://fred.stlouisfed.org/series/ENUC356230010 through q32022
+
+
+#   New York (NY):
+# Bronx County
+# Kings County (Brooklyn)
+# New York County (Manhattan)
+# Queens County
+# Richmond County (Staten Island)
+
+#   New Jersey (NJ):
+# Bergen County
+# Essex County
+# Hudson County
+# Hunterdon County
+# Middlesex County
+# Monmouth County
+# Morris County
+# Ocean County
+# Passaic County
+# Somerset County
+# Sussex County
+# Union County
+# Warren County
+
+#   Pennsylvania (PA):
+# Pike County
+
+
+
+# includes ----------------------------------------------------------------
 
 source(here::here("r", "libraries.r"))
 source(here::here("r", "libraries_ts.r"))
 source(here::here("r", "constants.r"))
 source(here::here("r", "functions.r"))
 
-```
 
-```{=html}
-<!-- links
+# FRED --------------------------------------------------------------------
+
+# https://fred.stlouisfed.org/series/NYWTOT bea wages nys through q4 2022
+# https://fred.stlouisfed.org/series/ENUC356230010SA bls qcew ny nj msa wages sa through q2 2022
+# https://fred.stlouisfed.org/series/ENUC356230010 bls qcew ny nj msa wages ns through q2 2022
 
 
-https://dol.ny.gov/occupational-and-industry-data
+vroom("https://fred.stlouisfed.org/series/ENUC105830010")
 
+# fredr(
+#   series_id = "UNRATE",
+#   observation_start = as.Date("1990-01-01"),
+#   observation_end = as.Date("2000-01-01")
+# )
 
--->
-```
+fredr(
+  series_id = "UNRATE",
+  observation_start = as.Date("1990-01-01"),
+  observation_end = as.Date("2000-01-01")
+)
 
-## The New York State Department of Labor's QCEW data
+df <- fredr(series_id="ENUC356230010")
+ht(df)
 
-The New York State Department of Labor (NYSDOL) provides a version of the BLS Quarterly Census of Employment and Wages (QCEW) that has quarterly county-level wage, establishment, and employment data in a format we need. The data currently available from 2000 through the fourth quarter of 2022.
+# NYS DOL -----
+# https://dol.ny.gov/quarterly-census-employment-and-wages
+# https://gcc02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fstatistics.labor.ny.gov%2Fqcew.zip&data=05%7C01%7CDOLCommun%40labor.ny.gov%7Ce17924198ffe48b036d908dad3bab9c6%7Cf46cb8ea79004d108ceb80e8c1c81ee7%7C0%7C0%7C638055096177546638%7CUnknown%7CTWFpbGZsb3d8eyJWIjoiMC4wLjAwMDAiLCJQIjoiV2luMzIiLCJBTiI6Ik1haWwiLCJXVCI6Mn0%3D%7C3000%7C%7C%7C&sdata=AJa0N6xpatr66uFPqtYLzDheBFOBkjDCG87BGQS1ZHc%3D&reserved=0
 
-```{r}
-#| label: ONETIME-get-save-nysdol-qcew
-#| eval: false
-#| include: false
+# DATA ELEMENTS AND DEFINITIONS for qcew_quarterly.txt
+# Data Element	Definition
+# AREATYPE        Type of Area (State, MSA, Labor Market Region, LWIA, County)
+# AREA		    Area Name
+# YEAR		    Year
+# QUARTER         Quarter of the year (1,2,3,4)
+# NAICS           NAICS industry classification code
+# NAICS_LEVEL           NAICS industry level
+# TITLE           NAICS Title
+# ESTAB		    Number of establishments
+# MNTH1EMP        Number employed for first month of given quarter
+# MNTH2EMP        Number employed in second month
+# MNTH3EMP        Number employed in third month
+# TOTWAGE	    Total wages
+# OWNER	Private or Government
+
 
 files <- fs::dir_ls(path=here::here("data", "nyqcew"),
                     glob = "*csv")
@@ -56,6 +122,29 @@ count(df, Owner)
 # 5 Total Government              558464
 # 6 Total Private and Government 8068156
 
+tmp <- count(df, NAICS, NAICS_LEVEL, NAICS_TITLE)
+# 00 All industries
+# 61 NAICS 61: Educational Services
+# 6111 4 NAICS 6111: Elementary and Secondary Schools [level 4]
+
+tmp |> filter(str_detect(NAICS_TITLE, "Colleg"))
+tmp |> filter(str_starts(NAICS_TITLE, "NAICS 61"))
+
+mtaregion <- read_csv("area
+Bronx County
+Kings County
+New York County
+Queens County
+Richmond County
+
+Dutchess County
+Nassau County
+Orange County
+Putnam County
+Rockland County
+Suffolk County
+Westchester County
+")
 
 df1 <- df |> 
   rename_with(tolower) |> 
@@ -65,20 +154,14 @@ df1 <- df |>
 
 saveRDS(df1, here::here("data", "nyqcew", "mtaqcew_raw.rds"))
 
-```
 
-
-```{r}
-#| label: ONETIME-save-nysdol-qcew-slim
-#| eval: false
-#| include: false
-
+# -------------------------------------------------------------------------
 
 mtawage1 <- readRDS(here::here("data", "nyqcew", "mtaqcew_raw.rds"))
 count(mtawage1, year, quarter) |> ht()
 
 mtawage2 <- mtawage1 |> 
-  filter(area=="New York State" | area %in% constants$mtaregion$area) |> 
+  filter(area=="New York State" | area %in% mtaregion$area) |> 
   mutate(date=yq(paste0(year, "-", quarter)),
          areatype=str_to_lower(areatype),
          region=case_when(area %in% mtaregion$area[1:5] ~ "nyc",
@@ -100,13 +183,8 @@ mtawage3 <- mtawage2 |>
 
 saveRDS(mtawage3, here::here("data", "nyqcew", "mtaqcew_slim.rds"))
 
-```
 
-
-```{r}
-#| label: ONETIME-mta-wagebase
-#| eval: false
-#| include: false
+# mta base ----------------------------------------------------------------
 
 mtawage3 <- readRDS(here::here("data", "nyqcew", "mtaqcew_slim.rds"))
 
@@ -156,45 +234,6 @@ mtabase1 <- mtawage3 |>
   mutate(pmtbase=total - naz(xk12) - naz(xfed))
 
 count(mtabase1, area, region)
-skim(mtabase1)
-
-saveRDS(mtabase1, here::here("data", "mta_wagebase.rds"))
-
-
-```
-
-Here is a summary of the resulting data file.
-
-
-```{r}
-#| label: summary
-#| eval: true
-#| include: true
-
-mtabase1 <- readRDS(here::here("data", "mta_wagebase.rds"))
-skim(mtabase1)
-
-```
-
-And correlation between total wages and the tax base after removing federal wages and K12 wages:
-
-```{r}
-#| label: correlation
-#| eval: true
-#| include: true
-
-mtabase1 |> filter(name=="totwage") |> select(total, pmtbase) |> cor()
-
-```
-
-
-
-```{r}
-#| label: explore
-#| eval: false
-#| include: false
-
-mtabase1 <- readRDS(here::here("data", "mta_wagebase.rds"))
 
 mtabase1 |> filter(name=="totwage") |> select(total, pmtbase) |> cor()
 
@@ -230,7 +269,5 @@ mtabase1 |>
   theme_bw() +
   theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
 
-
-```
 
 

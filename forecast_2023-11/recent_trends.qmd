@@ -1,0 +1,238 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Recent trends
+
+```{r}
+#| label: setup
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+```
+
+
+
+```{r}
+#| label: get-taxdata
+#| eval: true
+#| include: false
+
+pmt1 <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+count(pmt1, vname)
+glimpse(pmt1)
+
+# calculate pmt total
+pmt2 <- pmt1 |> 
+  filter(vname %in% c("pmt_nese_net", "pmt_wage")) |> 
+  summarise(value=sum(value), .by=c(date, year, month)) |> 
+  mutate(vname="pmt")
+summary(pmt2)
+
+pmt3 <- bind_rows(
+  pmt1 |> 
+    filter(vname %in% c("pmt_nese_net", "pmt_wage", "whnys")) |> 
+    select(date, year, month, vname, value),
+  pmt2) |> 
+  filter(date >= "2009-10-01") |> 
+  mutate(vname=case_when(vname=="pmt_nese_net" ~ "setax",
+                         vname=="pmt_wage" ~ "wagetax",
+                         TRUE ~ vname)) |> 
+  arrange(vname, date) |> 
+  mutate(pch=value / lag(value, 12) - 1, .by=vname)
+
+
+```
+
+
+## Tax revenue growth rates
+
+
+```{r}
+#| label: tax-growth-table
+#| eval: true
+
+tabdata <- pmt3 |> 
+  filter(date >= "2022-01-01", vname %in% c("pmt", "wagetax", "setax")) |> 
+  pivot_wider(names_from = vname, values_from = c(value, pch)) |> 
+  select(date, 
+         value_wagetax, value_setax, value_pmt,
+         pch_wagetax, pch_setax, pch_pmt)
+
+tabdata |> 
+  mutate(date=format.Date(date, "%Y-%b")) |> 
+  gt() |> 
+  tab_header(
+    title = html("Monthly PMT revenue collections by NYS"),
+    subtitle = html("$ millions")
+  ) |>
+  tab_spanner(columns = starts_with("value"),
+              label="Revenue amount") |> 
+  tab_spanner(columns = starts_with("pch"),
+              label="% change vs. year ago") |> 
+  cols_label(value_wagetax="Wage tax",
+             value_setax=html("Self-employment<br>tax"),
+             value_pmt="PMT total",
+             pch_wagetax="Wage tax",
+             pch_setax=html("Self-employment<br>tax"),
+             pch_pmt="PMT total") |> 
+  fmt_number(columns=starts_with("value"),
+             scale=1e-3,
+             decimals=3) |> 
+  fmt_percent(columns=starts_with("pch"),
+             decimals=1) |> 
+  sub_missing(missing_text = "--")
+
+```
+
+## Growth rates for total PMT and its components
+
+```{r}
+#| label: tax-growth
+#| eval: true
+#| include: true
+#| fig-width: 12
+#| fig-height: 8
+#| fig-column: page
+
+
+pmt3 |> 
+  filter(date >= "2022-01-01", vname %in% c("pmt", "wagetax", "setax")) |> 
+  ggplot(aes(date, pch, colour=vname)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_x_date(name=NULL, breaks = "1 month",  date_labels = "%Y-%b") +
+  scale_y_continuous(name="% change from year ago", 
+                     breaks=seq(-.5, .5, .05),
+                     labels=label_percent(accuracy=1),
+                     limits=c(-.25, .25)) +
+  theme_bw() +
+  x90 +
+  ggtitle("Growth rates for total PMT and wage and self-employment components")
+
+```
+
+## PMT wage-tax growth rates vs. NYS withholding growth rates
+
+```{r}
+#| label: pmt-nyswh-growth
+#| eval: true
+#| include: true
+#| fig-width: 12
+#| fig-height: 8
+#| fig-column: page
+
+pmt3 |> 
+  filter(date >= "2022-01-01", vname %in% c("whnys", "wagetax")) |> 
+  ggplot(aes(date, pch, colour=vname)) +
+  geom_line() +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_x_date(name=NULL, breaks = "1 month",  date_labels = "%Y-%b") +
+  scale_y_continuous(name="% change from year ago", 
+                     breaks=seq(-.5, .5, .02),
+                     labels=label_percent(accuracy=1),
+                     limits=c(-.2, .35)) +
+  theme_bw() +
+  x90 +
+  ggtitle("PMT wage tax and NYS withholding",
+          subtitle = "% change vs. year ago")
+
+```
+
+
+## Seasonality
+
+### Comparison of years
+
+```{r}
+#| label: ggseason_wagetax
+#| eval: true
+#| include: true
+#| fig-width: 12
+#| fig-height: 8
+#| fig-column: page
+
+pmt3 |> 
+  filter(vname=="wagetax", date >= "2010-10-01") |> 
+  filter(year(date)>=2019) |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_season(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions",
+                     labels=label_comma(scale=1e-3, accuracy=1)) +
+  labs(x="") +
+  ggtitle("PMT wage tax revenue") +
+  theme_bw() +
+  x90
+
+
+```
+
+
+## PMT wage tax revenue
+
+```{r}
+#| label: ggsubseries_wagetax
+#| eval: true
+#| include: true
+#| fig-width: 12
+#| fig-height: 8
+#| fig-column: page
+
+pmt3 |> 
+  filter(vname=="wagetax", date >= "2010-10-01") |> 
+  filter(year(date)>=2019) |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_subseries(value) +
+  geom_line(linewidth=1) +
+  geom_point(size=2) +
+  scale_y_continuous(name="$ millions",
+                     breaks=seq(0, 200, 25)*1e3,
+                     labels=label_comma(scale=1e-3, accuracy=1),
+                     limits=c(0, NA)) +
+  labs(x="") +
+  ggtitle("PMT wage tax revenue") +
+  theme_bw() +
+  x90
+
+```
+
+## PMT self-employment tax revenue
+
+```{r}
+#| label: ggsubseries_setax
+#| eval: true
+#| include: true
+#| fig-width: 12
+#| fig-height: 8
+#| fig-column: page
+
+pmt3 |> 
+  filter(vname=="setax", date >= "2010-10-01") |> 
+  filter(year(date)>=2019) |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  gg_subseries(value) +
+  geom_line(linewidth=1, colour="black") +
+  geom_hline(yintercept = 0) +
+  geom_point(size=2, colour="black") +
+  scale_y_continuous(name="$ millions",
+                     labels=label_comma(scale=1e-3, accuracy=1)) +
+  labs(x="") +
+  ggtitle("PMT self-employment tax revenue") +
+  theme_bw() +
+  x90
+
+```
+

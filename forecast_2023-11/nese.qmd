@@ -1,0 +1,518 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Net earnings from self-employment tax
+
+```{r}
+#| label: includes
+#| include: false
+
+source(here::here("r", "libraries.r"))
+source(here::here("r", "libraries_ts.r"))
+source(here::here("r", "constants.r"))
+source(here::here("r", "functions.r"))
+
+
+```
+
+```{=html}
+<!-- links
+
+
+-->
+```
+
+
+```{r}
+#| label: constants
+#| eval: true
+#| include: false
+
+source_qcew <- "Source: QCEW, obtained from NYSDOL"
+source_pmt <- "Source: Tax Department OpenData, with adjustments"
+
+x90 <- theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+```
+
+```{r}
+#| label: get-data
+#| eval: true
+#| include: false
+
+pmt <- readRDS(here::here("data", "mta_pmt_collections.rds"))
+glimpse(pmt)
+count(pmt, vname, tax)
+
+nese <- pmt |>
+  filter(vname=="pmt_nese_net") |> 
+  select(date, nese=value) |> 
+  arrange(date)
+
+```
+
+## Some plots
+
+```{r}
+#| label: explore
+#| eval: true
+#| include: true
+
+nese |> 
+  ggplot(aes(date, nese)) + 
+  geom_line() +
+  geom_point() +
+  ggtitle("Net earnings from self-employment revenue collections") +
+  scale_x_yearmonth(name=NULL, breaks="3 months", labels=label_date(format="%b-%Y")) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  theme_bw() +
+  x90
+
+nese |> 
+  mutate(nese12=roll_sumr(nese, n=12)) |> 
+  filter(year(date)>=2017) |> 
+  ggplot(aes(date, nese12)) + 
+  geom_line() +
+  geom_point() +
+  ggtitle("Rolling 12-month trailing sum of tax on net earnings from self-employment") +
+  scale_x_yearmonth(name=NULL, breaks="3 months", labels=label_date(format="%b-%Y")) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  theme_bw() +
+  x90
+
+# nese |> 
+#   mutate(nese12=roll_sumr(nese, n=12)) |> 
+#   filter(year(date)>=2020) |> 
+#   gt()
+
+
+```
+
+## Decomposition
+
+```{r}
+#| label: decomp
+#| eval: true
+#| include: true
+
+decomp <- nese |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  model(STL(nese ~ season(window = 13)))
+components(decomp)
+
+components(decomp) |> 
+  autoplot() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(name="$ millions",
+                     labels = label_comma(accuracy=1, scale=1e-3)) +
+  theme_bw()
+
+```
+
+
+## Seasonal plot
+
+A few comments about the seasonal plot below:
+
+-   Remember that payment dates are 15th of April (initial payment), June, Sept, January of next year, and April of next year (a settling up on the calendar year)
+
+-   Notice in the rolling graph above that we first started seeing the big dropoff in the 12-month sum for January 2023.
+
+-   Notice in the season plot below that Jan 2023 was \~\$20m below prior Januarys, and was highly atypical. If it were attributable to late payments we'd expect to see a surge in Feb 2023, but instead, we see, in the season plot, that Feb 2023 was slightly lower than average.
+
+-   Next unusual month is Apr 2023 (last data point we currently have). April ordinarily should be a big month because it has the initial payment for the new year *and* the settling-up payment for the prior year.
+
+-   It is well below the high values for Apr 2019 and Apr 2022, which I suspect are relatively normal Aprils.
+
+    -   It is well above the near-zero values for Apr 2020 and Apr 2021.
+
+    -   Presumably Apr 2020 (olive green) was low because due to Covid the Tax Department pushed April 2020 tax return dates to July 2020. You can see the huge spike in July 2020, consistent with this idea, after which 2020 looks more normal.
+
+    -   I don't know what happened in Apr 2021. Perhaps there were late payments or perhaps a processing glitch, but you can see that May 2021 -- approximately zero in other years -- had a spike suggesting it was just a one-month issue, after which 2021 looked pretty typical.
+
+    -   As for Apr 2023, why was it so much lower than Apr 2019 and Apr 2022? We'd need to understand what happened to underlying income in the 2022 tax year, since Apr 2023 includes a settling up on 2022, but one plausible hypothesis is that something bad happened to net self-employment income in late 2022 (June 2022 looked reasonably ok - a bit low - and while Sept 2022 was low it looks like revenue from that was pushed into Oct 2022 and was quite strong). This weakness in late 2022 was reflected in very low payments in Jan 2023 and Apr 2023.
+
+
+
+```{r}
+#| label: seasonal
+#| eval: true
+#| include: true
+
+nese |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  filter(year(date)>= 2019) |> 
+  gg_season(nese) +
+  geom_line(linewidth=1) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  scale_y_continuous(name="$ millions", labels = label_comma(scale=1e-3)) +
+  ggtitle("Seasonal plot of tax on net earnings from self-employment") +
+  labs(x="") +
+  theme_bw()
+  
+
+```
+
+## Explaining the recent declines
+
+-   If we were looking for deep understanding of the Jan 2023 and Apr 2023 phenomenon, we'd want to do the following:
+
+    -   Understand, in some detail, the major elements of net self-employment income and which elements are stable and which are highly variable and can change quickly.
+    
+    -   Your suspicion that the finance industry has something to do with it is mine as well, but we'd need to get some data to see. In personal income taxes (as opposed to net earnings from self-employment taxes), much of the finance-sector impact occurs through wages (bonuses) and capital gains, neither of which is in net earnings from self employment. So we'd have to look elsewhere - possibly money managment fees. Real estate is another businesss that is likely to be (a) conducted in non-corporate form, (b) have large money associated with it, and (c) subject to large swings.
+
+    -   After understanding the major components we'd look for economic data related to those components to see if those data are consistent with the hypothesis, and are helpful in explaining the past and forecasting the future.
+
+    -   We'd also look to see whether others are examining the issue. For example, has this affected the NYC UBT? I believe there are considerable similarities between the bases of the two taxes. Has NYC OMB on top of this? These are things it would make sense to check.
+
+
+## By month
+
+```{r}
+#| label: bymonth
+#| eval: true
+#| include: true
+#| fig-width: 14
+#| column: page
+
+
+ nese |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  filter(year(date)>= 2017) |> 
+  gg_subseries(nese) + 
+  geom_line(linewidth=1) +
+  geom_point() +
+  geom_hline(yintercept = 0, colour="darkgreen") +
+  scale_x_yearmonth(name=NULL, breaks="1 years", labels=label_date(format="%Y")) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 1e3, 10)*1000, labels = label_comma(scale=1e-3)) +
+  ggtitle("Tax on net earnings from self-employment") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = -90, vjust = 0, hjust=0.5))
+
+
+```
+
+## Autocorrelation
+
+```{r}
+#| label: autocorr
+#| eval: true
+#| include: true
+#| column: page
+
+ nese |> 
+  mutate(date=yearmonth(date)) |> 
+  as_tsibble(index=date) |> 
+  ACF(nese) %>%
+  autoplot() +
+  ggtitle("Net self-employment tax revenue collections, autocorrelation with prior months",
+          "Horizontal axis is lag in number of months. Vertical axis is correlation between current month and lagged month") +
+  theme_bw()
+```
+
+## Recent collections
+
+```{r}
+#| label: collections
+#| eval: true
+#| include: true
+
+nese |> 
+  mutate(nese12=roll_sumr(nese, n=12)) |> 
+  filter(year(date)>=2020) |> 
+  gt()
+
+```
+
+Here are screenshots from the Tax Department's collections spreadsheets for recent months. The net matches the online database net. That doesn't mean the numbers are right, but it does rule out one source of error.
+
+Furthermore, the big fall-off in January 2023 relative to earlier years does not appear to be related to a surge in refunds (although the state-city offset is not small).
+
+![](images/image-1783590106.png)
+
+![](images/image-529101534.png)
+
+![](images/image-762586789.png)
+
+![](images/image-873988109.png)
+
+![](images/image-858315092.png)
+
+## A simple forecast under current law
+
+```{r}
+#| label: fc-calc
+#| eval: true
+#| include: false
+
+nesemod <- nese |> 
+  arrange(date) |> 
+  mutate(date=yearmonth(date),
+         covid=date %in% yearmonth(c("2020-04-01", "2020-07-01"))) |> 
+  as_tsibble(index=date) |> 
+  model(
+    prophet = prophet(nese ~ covid + season(period="year", order=12, type = "multiplicative")),
+    arima = ARIMA(nese ~ covid))
+
+err <- nesemod |> 
+  augment() |> 
+  mutate(pcterr=.resid / nese) |> 
+  filter(!is.infinite(abs(pcterr)), nese != 0) |> 
+  as_tibble() |> 
+  summarise(mape=mean(abs(pcterr), na.rm=TRUE),
+            mdnape=median(abs(pcterr)), .by=c(.model))
+err
+
+skim(nese)
+
+(dates <- seq.Date(as.Date("2023-05-01"), by="1 months", length.out = 21) |> yearmonth())
+newdata <- tibble(date=dates) |> 
+  mutate(covid=FALSE) |> 
+  as_tsibble(index=date)
+newdata
+
+fc <- nesemod %>% 
+  forecast(new_data = newdata)
+
+fcfull <- fc |> 
+  as_tibble() |>
+  mutate(type="forecast") |> 
+  select(date, type, .model, nese=.mean)
+
+dfbase <- nesemod |> 
+  augment() |> 
+  mutate(type="history") |> 
+  select(date, type, .model, nese)
+
+nesefc <- dfbase |> 
+  as_tibble() |> 
+  bind_rows(fcfull)
+glimpse(nesefc)
+skim(nesefc)
+
+
+
+nesefc |> 
+  mutate(nese12=roll_sumr(nese, n=12), .by=.model) |> 
+  pivot_wider(names_from = .model, values_from = c(nese, nese12)) |> 
+  filter(year(date) %in% 2022:2024)
+
+```
+
+Here are measures of forecast fit for the two models - mean and median absolute percentage error. Both models are pretty inaccurate.
+
+```{r}
+#| label: fc-perform
+#| eval: true
+#| include: true
+
+err
+
+```
+
+### Plots of results
+
+Here are what the results look like:
+
+```{r}
+#| label: fc-plot
+#| eval: true
+#| include: true
+#| fig-width: 10
+
+nesefc |> 
+  filter(year(date) >= 2020) |> 
+  mutate(.model=ifelse(type=="history", "history", .model),
+         .model=factor(.model, levels=c("history", "arima", "prophet"))) |> 
+  ggplot(aes(date, nese, colour=.model)) +
+  scale_color_manual(values=c("grey40", "cyan", "darkgreen")) +
+  geom_line(linewidth=0.75) +
+  geom_point(size=1.25) +
+  geom_hline(yintercept = 0) +
+  geom_vline(xintercept = as.Date("2023-04-15"), linetype="dashed", colour="red", linewidth=.7) +
+  scale_x_yearmonth(breaks="3 months") +
+  scale_y_continuous("Monthly revenue, $ millions", labels=label_comma(scale=1e-3, accuracy=1)) +
+  ggtitle("Monthly revenue from two forecasts of net earnings from self employment tax",
+          subtitle="Red vertical line separates history from forecast.") +
+  labs(x="") +
+  theme_bw() +
+  x90
+
+
+#mutate(nese12=roll_sumr(nese, n=12), .by=.model) 
+ 
+
+nesefc |> 
+  mutate(nese12=roll_sumr(nese, n=12), .by=.model) |> 
+  filter(year(date) >= 2020) |> 
+  mutate(.model=ifelse(type=="history", "history", .model),
+         .model=factor(.model, levels=c("history", "arima", "prophet"))) |> 
+  ggplot(aes(date, nese12, colour=.model)) +
+  scale_color_manual(values=c("grey40", "cyan", "darkgreen")) +
+  geom_line(linewidth=0.75) +
+  geom_point(size=1.25) +
+  # geom_hline(yintercept = 0) +
+  geom_vline(xintercept = as.Date("2023-04-15"), linetype="dashed", colour="red", linewidth=.7) +
+  geom_vline(xintercept=as.Date(c("2022-12-01", "2023-12-01", "2024-12-01")), linetype="dashed", colour="grey50", linewidth=.7) +
+  scale_x_yearmonth(breaks="3 months") +
+  scale_y_continuous("Monthly revenue, $ millions", 
+                     breaks=seq(0, 1000, by=10)*1e3, 
+                     labels=label_comma(scale=1e-3, accuracy=1)) +
+  ggtitle("Rolling 12-month trailing sum of revenue from two forecasts of net earnings from self employment tax",
+          subtitle="Vertical line separates pure history from start of forecast. Grey vertical lines mark selected Decembers.") +
+  labs(x="") +
+  theme_bw() +
+  x90 
+ 
+
+```
+
+### What do you need to see in months ahead to hit these forecasts?
+
+Comparison across years of revenue by month
+
+```{r}
+#| label: fc-bymonth
+#| eval: true
+#| include: true
+#| fig-width: 14
+#| column: page
+
+nesefc |> 
+  filter(.model=="prophet") |> 
+  mutate(date=yearmonth(date), type=factor(type, levels=c("history", "forecast"))) |> 
+  as_tsibble(index=date) |> 
+  filter(year(date) %in% 2018:2024) |> 
+  gg_subseries(nese) + 
+  geom_line(linewidth=0.75, colour="blue") + # aes(colour=type), 
+  geom_point(aes(colour=type)) +
+  geom_hline(yintercept = 0, colour="darkgreen") +
+  # geom_vline(xintercept = as.Date("2023-04-15"), linetype="dashed", colour="red", linewidth=.4) +
+  scale_colour_manual(values=c("blue", "red")) +
+  scale_x_yearmonth(name=NULL, breaks="1 years", labels=label_date(format="%Y")) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 1e3, 5)*1000, labels = label_comma(scale=1e-3)) +
+  ggtitle("Tax on net earnings from self-employment",
+          subtitle="May 2023+ values are from facebook prophet model") +
+  theme_bw() +
+  x90
+ 
+nesefc |> 
+  filter(.model=="arima") |> 
+  mutate(date=yearmonth(date), type=factor(type, levels=c("history", "forecast"))) |> 
+  as_tsibble(index=date) |> 
+  filter(year(date) %in% 2018:2024) |> 
+  gg_subseries(nese) + 
+  geom_line(linewidth=0.75, colour="blue") + # aes(colour=type), 
+  geom_point(aes(colour=type)) +
+  geom_hline(yintercept = 0, colour="darkgreen") +
+  # geom_vline(xintercept = as.Date("2023-04-15"), linetype="dashed", colour="red", linewidth=.4) +
+  scale_colour_manual(values=c("blue", "red")) +
+  scale_x_yearmonth(name=NULL, breaks="1 years", labels=label_date(format="%Y")) +
+  scale_y_continuous(name="$ millions", breaks=seq(0, 1e3, 5)*1000, labels = label_comma(scale=1e-3)) +
+  ggtitle("Tax on net earnings from self-employment",
+          subtitle="May 2023+ values are from ARIMA model") +
+  theme_bw() +
+  x90 
+
+```
+
+## Tables of numbers, including rough NYC estimates
+
+
+```{r}
+#| label: fc-tables
+#| eval: true
+#| include: true
+#| echo: true
+
+nycshare <- .8
+ # transition rate of 0.47 percent (38.24% increase, or about half of the fully effective increase) that, per the effective date, “shall apply to taxable years beginning on or after January 1, 2023 and before January 1, 2024
+
+dates <- nesefc$date |> unique() |> as.Date()
+effrate <- tibble(date=dates) |> 
+  mutate(ratefactor=case_when(
+    date < "2023-04-01" ~ 0,
+    date >= "2023-04-01" &
+      date <= "2023-04-01" ~ (.47 - .34) / .34 * .6, # assumes 60% of this is from 2023 income
+    date >= "2023-05-01" &
+      date <= "2024-03-01" ~ (.47 - .34) / .34, # assumes all of this is from 2023 income
+    # assume 40% of Apr-May 2024 is from 2023 income, 60% from 2024
+    date %in% as.Date(c("2024-04-01", "2024-05-01")) ~ 
+      (.47 - .34) / .34 * .4 + (.60 - .34) / .34 * .6, 
+    date >= "2024-06-01" ~ (.60 - .34) / .34,
+    TRUE ~ -9999),
+    date=yearmonth(date))
+effrate |> filter(year(date) %in% 2023:2024)
+count(effrate, ratefactor)
+
+```
+
+
+```{r}
+#| label: fc-table-prep
+#| eval: true
+#| include: false
+
+tabdata <- nesefc  |> 
+  left_join(effrate, by = join_by(date)) |> 
+  mutate(nyctax=nese * nycshare,
+         nycincrease=nyctax * ratefactor,
+         total=nese + nycincrease,
+         nese12=roll_sumr(nese, n=12, na.rm=TRUE),
+         nycincrease12=roll_sumr(nycincrease, n=12, na.rm=TRUE),
+         total12=nese12 + nycincrease12,
+         .by=.model) |> 
+  select(-type) |> 
+  relocate(ratefactor, .after=.model)
+
+tab <- function(mod){
+  tabdata |> 
+  filter(.model==mod, year(date) %in% 2023:2024) |>
+  select(-.model) |> 
+  gt() |>
+  tab_header(
+    title = html(paste0("Simple PMT forecast, plus NYC increase (assumes 80% share): ", mod, " model"))
+  ) |>
+  fmt_number(columns=-c(date, ratefactor),
+             scale=1e-3,
+             decimals=1) |> 
+  fmt_percent(columns=ratefactor,
+              decimals=2)
+}
+
+```
+
+
+### ARIMA model
+
+```{r}
+#| label: fc-tables-arima
+#| eval: true
+#| include: true
+#| column: page
+
+tab("arima")
+```
+
+
+### facebook prophet model
+
+```{r}
+#| label: fc-tables-prophet
+#| eval: true
+#| include: true
+#| column: page
+
+tab("prophet")
+```
+
+
+
+

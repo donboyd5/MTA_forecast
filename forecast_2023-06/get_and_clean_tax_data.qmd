@@ -123,6 +123,11 @@ download.file(url, destfile=fpath, mode="wb")
 # create bulk filenames
 
 # representative file names for each fiscal year: ----
+
+# 2024
+# march 2024
+# https://www.tax.ny.gov/research/collections/april-2023-tax-collections.xls
+
 # 2023
 #  https://www.tax.ny.gov/research/collections/march-2023-tax-collections.xls
 #  https://www.tax.ny.gov/research/collections/april-2022-tax-collections.xls
@@ -221,7 +226,7 @@ geturl <- function(date){
       date <= "2020-08-01" ~ "pdf/stats/collections/",
     
     date >= "2020-09-01" &
-      date <= "2023-05-01" ~ "research/collections/",
+      date <= "2024-03-01" ~ "research/collections/",
     
     TRUE ~ "ERROR")
   
@@ -229,7 +234,7 @@ geturl <- function(date){
     # put the major exceptions first so they bypass other steps
     
     date >= "2021-08-01" &
-      date <= "2023-03-01" ~ "",  
+      date <= "2024-03-01" ~ "",  
     
     date %in% as.Date(c("2017-10-01",
                 "2017-11-01")) ~ "",
@@ -260,7 +265,9 @@ geturl <- function(date){
   
   mname <- month.name[month]
   
-  fname <- paste0(mname, "_", year, "_tax_collections.xls")
+  # fname <- paste0(mname, "_", year, "_tax_collections.xls")
+  ftype <- ifelse(date <= "2023-07-01", "xls", "xlsx")
+  fname <- paste0(mname, "_", year, "_tax_collections.", ftype)
   
   fname <- ifelse(date >= "2022-04-01",
                   str_replace_all(fname, "_", "-"),
@@ -286,11 +293,13 @@ f <- function(date){
   print(date)
   print(fn)
   fpath <- path(here::here("data", "dtf", "bulk", fn))
+  print(fpath)
   download.file(url, destfile=fpath, mode="wb")
   print("    ----    ")
 }
 
-dates <- seq.Date(as.Date("2008-04-01"), as.Date("2023-03-01"), "1 month")
+# dates <- seq.Date(as.Date("2008-04-01"), as.Date("2023-03-01"), "1 month")
+dates <- seq.Date(as.Date("2023-03-01"), as.Date("2023-09-01"), "1 month")
 
 purrr::walk(dates, f)
 purrr::walk(dates[1:36], f)
@@ -352,7 +361,7 @@ get_fpath <- function(year, month){
 
 fn <- get_fname(2022, 3)
 # fpath <- path(here::here("data", "dtf", "bulk", fn))
-fpath < get_fpath(2022, 3)
+fpath <- get_fpath(2022, 3)
 excel_sheets(fpath)
 read_excel(fpath)
 
@@ -362,11 +371,15 @@ df <- read_excel(fpath, sheet=1)
 
 f <- function(date){
   print(date)
-  date=as.Date(date)
+  date <- as.Date(date)
   year <- year(date)
   month <- month(date)
   fpath <- get_fpath(year, month)
-  cnames <- c("item", "gross", "refunds", "net", "junk", "fygross", "fyrefunds", "fynet")
+  if(date <= as.Date("2023-06-01")){
+    cnames <- c("item", "gross", "refunds", "net", "junk", "fygross", "fyrefunds", "fynet")
+  } else {
+    cnames <- c("item", "gross", "refunds", "net", "junk", "junk2", "fygross", "fyrefunds", "fynet")
+  }
   df1 <- read_excel(fpath, sheet=1, col_names = FALSE, col_types = "text")
   df2 <- df1 |> 
     select(1:length(cnames)) |> 
@@ -381,14 +394,16 @@ f <- function(date){
 
 check <- f(fpath)
 
-check <- f("2022-01-01")
+check <- f("2023-06-01")
+check <- f("2023-08-01")
+# date <- "2023-08-01"
 
 df <- purrr:::map(filedf$date, f, .progress=TRUE)
 
 df2 <- df |> 
   list_rbind() |> 
   filter(fynet != "Monthly Gross and  Net  Tax Collections") |> 
-  select(-junk)
+  select(date:fynet)
 
 saveRDS(df2, here::here("data", "monthly_raw.rds"))
 
@@ -402,6 +417,9 @@ saveRDS(df2, here::here("data", "monthly_raw.rds"))
 
 mtax <- readRDS(here::here("data", "monthly_raw.rds"))
 
+mtax |> 
+  filter(date %in% as.Date(c("2023-08-01")))
+
 check <- count(mtax, item)
 
 mtavars <- check |> 
@@ -409,8 +427,14 @@ mtavars <- check |>
            str_detect(item, "MCTM") |
            str_detect(item, "M.T.A."))
 
+mtavars
+
 mta1 <- mtax |> 
   filter(item %in% mtavars$item)
+
+mta1 |> 
+  filter(date %in% as.Date(c("2023-06-01", "2023-07-01", "2023-08-01")))
+
 
 pmt <- mta1 |> 
   filter(str_detect(item, "Mobil")) |> 
@@ -452,6 +476,10 @@ df2 <- df |>
          year=ifelse(month > 3, sfy - 1, sfy),
          date=as.Date(paste0(year, "/", month, "/", 1))) |> 
   arrange(date)
+
+names(df)
+names(df2)
+cbind(names(df2)[1:length(names(df))], names(df))
 
 count(df2, fymonth, month)
 count(df2, month, fymonth)
@@ -643,11 +671,22 @@ pdata |>
 
 pdata |> 
   mutate(year=year(date),
-         period=ifelse(month(date)<5, "jan_apr", "may_dec")) |> 
+         period=ifelse(month(date) < 5, "jan_apr", "may_dec")) |> 
   summarise(value=sum(value), .by=c(year, period)) |> 
   filter(year <= 2024) |> 
   pivot_wider(names_from = period) |> 
   mutate(tot=jan_apr + may_dec) |> 
+  mutate(across(.cols=-year,
+                ~ .x / lag(.x) - 1,
+         .names = "{.col}_pch"))
+
+pdata |> 
+  mutate(year=year(date),
+         period=ifelse(month(date) < 9, "jan_aug", "sep_dec")) |> 
+  summarise(value=sum(value), .by=c(year, period)) |> 
+  filter(year <= 2024) |> 
+  pivot_wider(names_from = period) |> 
+  mutate(tot=jan_aug + sep_dec) |> 
   mutate(across(.cols=-year,
                 ~ .x / lag(.x) - 1,
          .names = "{.col}_pch"))
